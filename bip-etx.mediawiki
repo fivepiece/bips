@@ -1,0 +1,45 @@
+<pre>
+  BIP: XYZ
+  Title: Extended Transaction
+  Author: Noel Tiernan <tier.nolan@gmail.com>
+  Status: Draft
+  Type: Standards Track
+  Created: 2015-05-10
+</pre>
+
+==Abstract==
+
+Transactions references all unspent transaction outputs (UTXOs) by transaction id (txid) and index.  No information about the UTXO is contained in the transaction which spends it.
+
+This BIP contains a description of a transaction serialization that contains sufficient infomation about UTXOs being spent to fully verify the transaction, other than UTXO existence and double spend checks.  This is purely a network protocol change.  The transaction serialization used for signing and generating the txid are not modified.
+
+==Motivation==
+
+The are primarily two benefits from this change.
+
+# Each UTXOs entry in the database can be reduced in size
+# Improves transactions verification locality
+
+===UTXO Entry Size===
+
+The UTXO database stores key/value pairs.  Every transaction that has at least one unspent output is contained in the database.
+
+The key used is the txid (32 bytes) and the value is a compressed representation of the UTXOs for that transaction.
+
+For each UTXO, four pieces of information are stored; the value of the UTXO, the scriptPubKey, the height it was included in the chain and if the transaction was a coinbase transaction.
+
+At the time of writing, the UTXO set serialization is ?? bytes per UTXO.  
+
+If all the information about the UTXO was known, then the UTXOs could be stored in the database as a set of hashes.  Each entry could be stored as hash(node_specific_salt | hash(txid | n | height | coinbase | scriptPubKey | value)).
+
+The entire hash would not be needed.  If the lower 8 bytes were stored and assuming 20 million UTXOs in the set, the odds of a collision is 1 in 92234.  In the unlikely event that a node accepted a false transaction, other nodes would reject it.  With 10 bytes, the odds are one in 6 billion.
+
+===Transaction Verification Locality===
+
+If the scriptPubKey, value and coinbase status for all UTXOs spent by a transaction are known, transactions can be nearly completely verified without any additional information.  The only checks that can't be done locally are checking for double spending and making sure the outputs spent actually exist.
+
+This could help with the new consensus ibrary.  The block verification function could be given a block header and a list of extended transactions and it could verify them locally.  The function could give a list of the digests of all UTXOs consumed, and a list of the digests of all new digests created.  A client using the library only has to manage the UTXO digest set.  Everything else can be handled by the consensus library.
+
+==Specification==
+
+
