@@ -90,7 +90,7 @@ Use of the UTXO_P2SH and UTXO_P2PKH type is mandatory, if the UTXO matches the t
 
 The extended block, "eblock", message is identical to the block message, except transaction are serialized as extended transactions.
 
-==PK Script Recovery==
+====PK Script Recovery====
 
 The pk_script can be recovered from the signature script when the pay to script hash and pay to public key hash templates are used.
 
