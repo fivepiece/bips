@@ -34,7 +34,7 @@ If all the information about the UTXO was known, then the UTXOs could be stored 
 
 The entire hash would not be needed.  If the lower 8 bytes were stored and assuming 20 million UTXOs in the set, the odds of a collision is 1 in 92234.  In the unlikely event that a node accepted a false transaction, other nodes would reject it.  With 10 bytes, the odds are one in 6 billion.
 
-The odds of a node accepting a false transaction is even lower.  If 8 bytes is used per entry, a transaction with a non-existent input has a one in 922 billion.  Even when knowing the node_specific_salt, this is considerable effort and only one node will actually accept the false transaction.
+The odds of a node accepting a false transaction is even lower.  If 8 bytes is used per entry, a transaction with a non-existent input has a one in 922 billion chance of being accepted.  Even when knowing the node_specific_salt, this is considerable effort and only one node will actually accept the false transaction.
 
 ====Transaction Verification Locality====
 
