@@ -9,7 +9,7 @@
 
 ==Abstract==
 
-Transactions references all unspent transaction outputs (UTXOs) by transaction id (txid) and index.  No information about the UTXO is contained in the transaction which spends it.
+Transactions references all unspent transaction outputs (UTXOs) by transaction id (txid) and index.  No other information about the UTXO is contained in the transaction which spends it.
 
 This BIP contains a description of a transaction serialization that contains sufficient infomation about UTXOs being spent to fully verify the transaction, other than UTXO existence and double spend checks.  This is purely a network protocol change.  The transaction serialization used for signing and generating the txid are not modified.
 
@@ -42,4 +42,106 @@ This could help with the new consensus ibrary.  The block verification function 
 
 ==Specification==
 
+This BIP defines two new messages, the etx (Extended Transaction) message and the eblock (Extended Block) message.
 
+====Extended Transaction Message====
+
+The extended transaction, "etx", message is identical to the "tx" message, except for additional fields in the OutPoint datatype.  The new EOutPoint field is defined as follows.
+
+{|class="wikitable"
+! Field Size !! Description !! Data type !! Comments
+|-
+| 32 || txid || uint256 || The txid of the referenced transaction
+|-
+| 4 || index || uint32_t || The index of the UTXO
+|-
+| 8 || value || int64_t || The value of the UTXO
+|-
+| 1 || utxo_type || uchar || The type of the UTXO
+|-
+| 1+ || pk_script_length || var_int || Length of the pk_script
+|-
+| ? || pk_script || uchar || The public key script for the output
+|-
+| 1+ || height || min_height || The minimum block height that this UTXO can be included in
+|}
+
+There are three UTXO types.
+
+{|class="wikitable"
+! Value !! Name !! Description
+|-
+| 0 || UTXO_RAW || Uncompressed pk_script
+|-
+| 1 || UTXO_P2SH || Pay to script hash template
+|-
+| 2 || UTXO_P2PKH || Pay to public key hash template
+|}
+
+The pk_script array is only used for the UTXO_RAW type.  In the other two cases, it stores a zero length array and the pk_script is recovered from the signature script.  
+
+Use of the UTXO_P2SH and UTXO_P2PKH type is mandatory, if the UTXO matches the template.
+
+====Extended Block Message====
+
+The extended block, "eblock", message is identical to the block message, except transaction are serialized as extended transactions.
+
+==PK Script Recovery==
+
+The pk_script can be recovered from the signature script when the pay to script hash and pay to public key hash templates are used.
+
+The signature script is run to determine the top entry in the stack.  If the stack is empty or the top entry is not 20 bytes, then the transaction is invalid.
+
+The template for P2SH is as follows.
+
+{|class="wikitable"
+! Byte Index !! Byte Value !! Opcode Name ||  Notes
+|-
+| 0 || 0xA9 || OP_HASH160 || 
+|-
+| 1 || 0x14 || Push 20 bytes || 
+|-
+| 2-21 || Script Hash || || Copy the top of the stack
+|-
+| 22 || 0x87 || OP_EQUAL || 
+|}
+
+The template for P2PKH is as follows.
+
+{|class="wikitable"
+! Byte Index !! Byte Value !! Opcode Name ||  Notes
+|-
+| 0 || 0x76 || OP_DUP || 
+|-
+| 1 || 0xA9 || OP_HASH160 || 
+|-
+| 2 || 0x14 || Push 20 bytes || 
+|-
+| 3-22 || Key Hash || || Copy the top of the stack
+|-
+| 23 || 0x88 || OP_EQUALVERIFY ||
+|-
+| 24 || 0xAC || OP_CHECKSIG ||
+|}
+
+==Deployment==
+
+The PROTOCOL_VERSION is incremented from 70002 to 70003.  The eblock and etx messages should be used for all peers that are operating on protocol version 70003 and above.  
+
+Transactions and blocks received from legacy nodes should be upgraded to etx and eblock format before forwarding.
+
+The block and tx message type should be used for nodes operating on protocol less than 70003.
+
+Transactions should not be forwarded, except as part of a block, if any of the signature scripts contains non-push opcode.
+
+==Backward Compatibility==
+
+The two new messages etx and eblock can be converted into tx and block messages by dropping the additional information.  This allows updated nodes to easily communicate with legacy nodes.  
+
+Updated nodes still maintain the full UTXO set.  They can upgrade tx and block messages to eblock and etx messages.
+
+Future nodes may refuse to accept the block and tx messages, since they only store the reduced UTXO set.  These nodes would not be able to upgrade blocks and transactions.  If at least one node had the full UTXO set data, then it could act as border node between the 2 network domains.
+
+As long as all miners run upgraded nodes, then eblocks would always be available and blocks could be downgraded for legacy nodes.  
+
+Legacy nodes may be unable to spend their coins since they cannot create etx messages and the number of nodes willing to do the upgrade may dimish.  Wallet software could easily be updated to produce etx messages.  It is more efficient for wallets to manage their own UTXOs than expecting the data to be stored on every noce.
