@@ -148,4 +148,4 @@ Future nodes, which only store the reduced size UTXO set, would be unable to ver
 
 If all miners run upgraded nodes, then all new blocks would be available in the eblock format and legacy nodes could receive downgraded versions.
 
-Legacy nodes may be unable to spend their coins unless they peer with nodes that can perform the upgrade.  Wallet software could easily be updated to produce etx messages.  It is more efficient for wallets to manage their own UTXOs than expecting the data to be stored on every noce.
+Legacy nodes may be unable to spend their coins unless they peer with nodes that can perform the upgrade, directly or via a path of legacy nodes.  Wallet software could easily be updated to produce etx messages.  It is more efficient for wallets to manage their own UTXOs than expecting the data to be stored on every noce.
