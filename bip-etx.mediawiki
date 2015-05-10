@@ -130,7 +130,7 @@ The template for P2PKH is as follows.
 
 ==Deployment==
 
-The PROTOCOL_VERSION is incremented from 70002 to 70003.  The eblock and etx messages must be used, instead of the block and tx messages, for all peers that are operating on protocol version 70003 and above.  
+The PROTOCOL_VERSION is incremented from 70002 to 70003.  The eblock and etx messages must be used, instead of the block and tx messages, for all peers that are operating on protocol version 70003 and above.
 
 Transactions and blocks received from legacy nodes should be upgraded to etx and eblock format before forwarding.
 
