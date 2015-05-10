@@ -36,6 +36,8 @@ The entire hash would not be needed.  If the lower 8 bytes were stored and assum
 
 The odds of a node accepting a false transaction is even lower.  If 8 bytes is used per entry, a transaction with a non-existent input has a one in 922 billion chance of being accepted.  Even when knowing the node_specific_salt, this is considerable effort and only one node will actually accept the false transaction.
 
+In addition, since the UTXO entry size can be fixed, it may be possible to store the database more efficiently due to fixed field sizes.  Very long scriptPubKeys can be supported without increasing the UTXO database size.
+
 ====Transaction Verification Locality====
 
 If the scriptPubKey, value and coinbase status for all UTXOs spent by a transaction are known, transactions can be nearly completely verified without any additional information.  The only checks that can't be done locally are checking for double spending and making sure the outputs spent actually exist.
