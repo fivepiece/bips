@@ -30,9 +30,9 @@ For each UTXO, four pieces of information are stored; the value of the UTXO, the
 
 At the time of writing, the UTXO set serialization is 35.89 bytes per UTXO.  
 
-If all the information about the UTXO was known, then the UTXOs could be stored in the database as a set of hashes.  Each entry could be stored as hash(node_specific_salt | hash(txid | index | height | is_coinbase | scriptPubKey | value)).
+If all the information about the UTXO was known, then the UTXOs could be stored in the database as a set of hashes.  Each entry could be stored as the lower bytes of hash(txid | index | height | is_coinbase | scriptPubKey | value).
 
-The entire hash would not be needed.  If the lower 8 bytes were stored and assuming 20 million UTXOs in the set, the odds of a collision is 1 in 92234.  With 10 bytes, the odds are one in 6 billion.  If a collision occured, the node could pick a new salt and reindex.  Most nodes would never have to do that.
+If the lower 8 bytes were stored and assuming 20 million UTXOs in the set, the odds of a collision is 1 in 92234.  With 10 bytes, the odds are one in 6 billion.  Collisions are unlikely to occur in practice, so blocks that cause collisions could simply be rejected.  One of the colliding transactions could be included in the block and the other transaction(s) could be included in later block.  This would change the height value and the transaction would be unlikely to collide.
 
 The odds of a node accepting a false transaction is even lower.  If 8 bytes is used per entry, a transaction with a non-existent input has a one in 922 billion chance of being accepted.  Even knowing the node_specific_salt, this is considerable effort and only one node will actually accept the false transaction.
 
@@ -46,11 +46,13 @@ This could help with the new consensus ibrary.  The block verification function 
 
 ==Specification==
 
-This BIP defines two new messages, the etx (Extended Transaction) message and the eblock (Extended Block) message.
+This BIP defines a change to how transactions are encoded.  This affects the transaction, "tx", and block, "block" messages.  The new serialization format is used if the protocol version number is 70003 or greater.
 
-====Extended Transaction Message====
+The format change only applies to the p2p protocol.  Transactions are still serialized as before when signing and determining the txid.
 
-The extended transaction, "etx", message is identical to the "tx" message, except for additional fields in the OutPoint datatype.  The new EOutPoint field is defined as follows.
+====Transaction Message====
+
+The new transaction, "tx", message is identical, except for additional fields in the OutPoint datatype.  The new OutPoint field is defined as follows.
 
 {|class="wikitable"
 ! Field Size !! Description !! Data type !! Comments
@@ -59,16 +61,18 @@ The extended transaction, "etx", message is identical to the "tx" message, excep
 |-
 | 4 || index || uint32_t || The index of the UTXO
 |-
-| 8 || value || int64_t || The value of the UTXO
+| 8 || value || int64_t || The value of the UTXO (New)
 |-
-| 1 || utxo_type || uchar || The type of the UTXO
+| 1 || utxo_type || uchar || The type of the UTXO (New)
 |-
-| 1+ || pk_script_length || var_int || Length of the pk_script
+| 1+ || pk_script_length || var_int || Length of the pk_script (New)
 |-
-| ? || pk_script || uchar || The public key script for the output
+| ? || pk_script || uchar[] || The public key script for the output (New)
 |-
-| 1+ || height || min_height || The minimum block height that this UTXO can be included in
+| 1+ || height || var_int || The minimum block height that this UTXO can be included in
 |}
+
+The minimum height is equal to the height of the block that the transaction is included in, or height + COINBASE_MATURITY for coinbase UTXOs.
 
 There are three UTXO types.
 
@@ -86,13 +90,13 @@ The pk_script array is only used for the UTXO_RAW type.  In the other two cases,
 
 Use of the UTXO_P2SH and UTXO_P2PKH type is mandatory, if the UTXO matches the template.
 
-====Extended Block Message====
+====Block Message====
 
-The extended block, "eblock", message is identical to the block message, except transaction are serialized as extended transactions.
+The new block, "block", message is identical to the block message, except transaction are serialized as using the new format.
 
 ====Service Flag====
 
-Upgraded nodes would assert the EXTENDED_TX service bit.  This means that the node supports extended transactions.
+Upgraded nodes should assert the EXTENDED_TX service bit.  This means that the node supports the new transaction format.
 
 ====PK Script Recovery====
 
@@ -132,19 +136,54 @@ The template for P2PKH is as follows.
 | 24 || 0xAC || OP_CHECKSIG ||
 |}
 
+==Special Case Rule For BIP30 Compliance==
+
+There are two pairs of coinbase transactions that have the same txid.  Only one output of each pair is spendable, but all 4 outputs would generate different digests.
+
+This would mean that all 4 are spendable, which is incorrect and could cause a fork.
+
+An additional rule is required to prevent all 4 outputs being added into the UTXO set.  This can be achieved by excluding the 2nd coinbase of each pair from being included in the UTXO set.  The condition is the same as for BIP30.
+
+    
+    bool fExcludeCoinbaseUTXO = !((pindex->nHeight==91842 && pindex->GetBlockHash() == uint256("0x00000000000a4d0a398161ffc163c503763b1f4360639393e0e4c8e300e0caec")) ||
+                                  (pindex->nHeight==91880 && pindex->GetBlockHash() == uint256("0x00000000000743f190a18c5577a3c2d2a1f610ae9601ac046a38084ccb7cd721")));
+    
+    
+When processing those two blocks, the UTXO from the coinbase must not be added to the UTXO set.
+
+==Canonical Digest==
+
+The canonical digest for each UTXO shall be equal to first 10 bytes of the digest given when the UTXO serialization is passed to the double SHA256 hash function.
+
+{|class="wikitable"
+! Field Size !! Description !! Data type !! Comments
+|-
+| 32 || txid || uint256 || The txid of the referenced transaction
+|-
+| 4 || index || uint32_t || The index of the UTXO
+|-
+| 8 || value || int64_t || The value of the UTXO (New)
+|-
+| ? || pk_script || uchar[] || The public key script for the output (New)
+|-
+| 4 || height || uint32_t || The minimum block height that this UTXO can be included in
+|}
+
+A soft fork rule is added.  Transactions with outputs which collide with entries in the UTXO set may not be included in the block.  The block is processed from the first transaction to the last.  UTXOs spent by the transaction are removed from the set before its outputs are added.
+
 ==Deployment==
 
-The PROTOCOL_VERSION is incremented from 70002 to 70003.  The eblock and etx messages must be used, instead of the block and tx messages, for all peers that are operating on protocol version 70003 and above.
+The PROTOCOL_VERSION is incremented from 70002 to 70003.
 
-Transactions and blocks received from legacy nodes should be upgraded to etx and eblock format before forwarding.
-
-The block and tx message type should be used for nodes operating on protocol less than 70003.
+Transactions and blocks received from legacy nodes must be converted to new format before forwarding to new upgraded peers.
 
 Transactions should not be forwarded, except as part of a block, if any of the signature scripts contains non-push opcodes.
 
+The soft fork mechanism in effect at the time of deployment shall be used to handle the no-collision rule for the canonical digests.
+
 ==Backward Compatibility==
 
-The two new messages etx and eblock can be converted into tx and block messages by dropping the additional information.  This allows updated nodes to easily communicate with legacy nodes.  
+The two new message formats can be converted into the old format by dropping the additional information.  This allows updated nodes to easily communicate with legacy nodes.
 
 There will be three types of nodes.
 
@@ -154,9 +193,9 @@ There will be three types of nodes.
 
 Legacy nodes are nodes which haven't upgraded to the extended transaction format.  
 
-Full border nodes are upgraded nodes which maintain the full UTXO set,  They would upgrade transaction and block messages to the extended format and can communicate with legacy nodes.  They can act as border nodes between legacy and UTXO-lite nodes.
+Full border nodes are upgraded nodes which maintain the full UTXO set.  They can upgrade the transaction and block messages to the new format and send information to legacy nodes.  They act as border nodes between legacy and UTXO-lite nodes, allowing information from legacy nodes to reach UTXO-lite nodes.
 
-"UTXO-lite" nodes are nodes which only store the reduced UTXO digest set.  This type of node would not exist initially.  When deployed, they would only make outgoing connections to EXTENDED_TX nodes.  As long as they receive extended blocks, they are fully verifying nodes.
+UTXO-lite nodes are nodes which only store the reduced UTXO digest set.  This type of node would not exist initially.  When deployed, they would only make outgoing connections to EXTENDED_TX nodes.  As long as they receive extended blocks, they are fully verifying nodes.
 
 If all miners run upgraded nodes, then all new blocks would initially be broadcast in extended format and legacy nodes could receive downgraded versions.
 
