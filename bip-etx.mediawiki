@@ -28,11 +28,13 @@ The key used is the txid (32 bytes) and the value is a compressed representation
 
 For each UTXO, four pieces of information are stored; the value of the UTXO, the scriptPubKey, the height it was included in the chain and if the transaction was a coinbase transaction.
 
-At the time of writing, the UTXO set serialization is ?? bytes per UTXO.  
+At the time of writing, the UTXO set serialization is 35.89 bytes per UTXO.  
 
-If all the information about the UTXO was known, then the UTXOs could be stored in the database as a set of hashes.  Each entry could be stored as hash(node_specific_salt | hash(txid | n | height | coinbase | scriptPubKey | value)).
+If all the information about the UTXO was known, then the UTXOs could be stored in the database as a set of hashes.  Each entry could be stored as hash(node_specific_salt | hash(txid | index | height | is_coinbase | scriptPubKey | value)).
 
 The entire hash would not be needed.  If the lower 8 bytes were stored and assuming 20 million UTXOs in the set, the odds of a collision is 1 in 92234.  In the unlikely event that a node accepted a false transaction, other nodes would reject it.  With 10 bytes, the odds are one in 6 billion.
+
+The odds of a node accepting a false transaction is even lower.  If 8 bytes is used per entry, a transaction with a non-existent input has a one in 922 billion.  Even when knowing the node_specific_salt, this is considerable effort and only one node will actually accept the false transaction.
 
 ====Transaction Verification Locality====
 
