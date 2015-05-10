@@ -142,7 +142,7 @@ Transactions should not be forwarded, except as part of a block, if any of the s
 
 The two new messages etx and eblock can be converted into tx and block messages by dropping the additional information.  This allows updated nodes to easily communicate with legacy nodes.  
 
-Updated nodes still maintain the full UTXO set.  They can upgrade tx and block messages to eblock and etx messages.
+Updated nodes still maintain the full UTXO set and so can upgrade tx and block messages to eblock and etx messages.
 
 Future nodes may refuse to accept the block and tx messages, since they only store the reduced UTXO set.  These nodes would not be able to upgrade blocks and transactions.  If at least one node had the full UTXO set data, then it could act as border node between the 2 network domains.
 
