@@ -144,8 +144,8 @@ The two new messages etx and eblock can be converted into tx and block messages 
 
 Updated nodes still maintain the full UTXO set and so can upgrade tx and block messages to eblock and etx messages.
 
-Future nodes may refuse to accept the block and tx messages, since they only store the reduced UTXO set.  These nodes would not be able to upgrade blocks and transactions.  If at least one node had the full UTXO set data, then it could act as border node between the 2 network domains.
+Future nodes, which only store the reduced size UTXO set, would be unable to verify block and tx messages or upgrade them to etx and eblock messages.  If at least one node had the full UTXO set data, then it could act as border node between the 2 network domains.
 
-As long as all miners run upgraded nodes, then eblocks would always be available and blocks could be downgraded for legacy nodes.  
+If all miners run upgraded nodes, then all new blocks would be available in the eblock format and legacy nodes could receive downgraded versions.
 
-Legacy nodes may be unable to spend their coins since they cannot create etx messages and the number of nodes willing to do the upgrade may dimish.  Wallet software could easily be updated to produce etx messages.  It is more efficient for wallets to manage their own UTXOs than expecting the data to be stored on every noce.
+Legacy nodes may be unable to spend their coins unless they peer with nodes that can perform the upgrade.  Wallet software could easily be updated to produce etx messages.  It is more efficient for wallets to manage their own UTXOs than expecting the data to be stored on every noce.
