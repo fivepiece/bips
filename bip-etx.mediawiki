@@ -155,6 +155,8 @@ When processing those two blocks, the UTXO from the coinbase must not be added t
 
 The canonical digest for each UTXO shall be equal to first 10 bytes of the digest given when the UTXO serialization is passed to the double SHA256 hash function.
 
+The UTXO set serialization is as follows.
+
 {|class="wikitable"
 ! Field Size !! Description !! Data type !! Comments
 |-
@@ -169,7 +171,11 @@ The canonical digest for each UTXO shall be equal to first 10 bytes of the diges
 | 4 || height || uint32_t || The minimum block height that this UTXO can be included in
 |}
 
-A soft fork rule is added.  Transactions with outputs which collide with entries in the UTXO set may not be included in the block.  The block is processed from the first transaction to the last.  UTXOs spent by the transaction are removed from the set before its outputs are added.
+==Soft Fork Rule==
+
+Transactions with outputs which collide with entries in the UTXO set may not be included in the block.  The block is processed from the first transaction to the last.  UTXOs spent by the transaction are removed from the set before its outputs are added.
+
+Two UTXOs collide if they both have the same canonical digest.
 
 ==Deployment==
 
