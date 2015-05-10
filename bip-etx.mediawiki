@@ -32,7 +32,7 @@ At the time of writing, the UTXO set serialization is 35.89 bytes per UTXO.
 
 If all the information about the UTXO was known, then the UTXOs could be stored in the database as a set of hashes.  Each entry could be stored as hash(node_specific_salt | hash(txid | index | height | is_coinbase | scriptPubKey | value)).
 
-The entire hash would not be needed.  If the lower 8 bytes were stored and assuming 20 million UTXOs in the set, the odds of a collision is 1 in 92234.  In the unlikely event that a node accepted a false transaction, other nodes would reject it.  With 10 bytes, the odds are one in 6 billion.
+The entire hash would not be needed.  If the lower 8 bytes were stored and assuming 20 million UTXOs in the set, the odds of a collision is 1 in 92234.  With 10 bytes, the odds are one in 6 billion.  If a collision occured, the node could pick a new salt and reindex.  Most nodes would never have to do that.
 
 The odds of a node accepting a false transaction is even lower.  If 8 bytes is used per entry, a transaction with a non-existent input has a one in 922 billion chance of being accepted.  Even when knowing the node_specific_salt, this is considerable effort and only one node will actually accept the false transaction.
 
