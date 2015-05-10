@@ -90,6 +90,10 @@ Use of the UTXO_P2SH and UTXO_P2PKH type is mandatory, if the UTXO matches the t
 
 The extended block, "eblock", message is identical to the block message, except transaction are serialized as extended transactions.
 
+====Service Flag====
+
+Upgraded nodes would assert the EXTENDED_TX service bit.  This means that the node supports extended transactions.
+
 ====PK Script Recovery====
 
 The pk_script can be recovered from the signature script when the pay to script hash and pay to public key hash templates are used.
@@ -142,10 +146,18 @@ Transactions should not be forwarded, except as part of a block, if any of the s
 
 The two new messages etx and eblock can be converted into tx and block messages by dropping the additional information.  This allows updated nodes to easily communicate with legacy nodes.  
 
-Updated nodes still maintain the full UTXO set and so can upgrade tx and block messages to eblock and etx messages.
+There will be three types of nodes.
 
-Future nodes, which only store the reduced size UTXO set, would be unable to verify block and tx messages or upgrade them to etx and eblock messages.  If at least one node had the full UTXO set data, then it could act as border node between the 2 network domains.
+* Legacy nodes
+* Full Border nodes
+* UTXO-lite nodes
 
-If all miners run upgraded nodes, then all new blocks would be available in the eblock format and legacy nodes could receive downgraded versions.
+Legacy nodes are nodes which haven't upgraded to the extended transaction format.  
 
-Legacy nodes may be unable to spend their coins unless they peer with nodes that can perform the upgrade, directly or via a path of legacy nodes.  Wallet software could easily be updated to produce etx messages.  It is more efficient for wallets to manage their own UTXOs than expecting the data to be stored on every noce.
+Full border nodes are upgraded nodes which maintain the full UTXO set,  They would upgrade transaction and block messages to the extended format and can communicate with legacy nodes.  They can act as border nodes between legacy and UTXO-lite nodes.
+
+"UTXO-lite" nodes are nodes which only store the reduced UTXO digest set.  This type of node would not exist initially.  When deployed, they would only make outgoing connections to EXTENDED_TX nodes.
+
+If all miners run upgraded nodes, then all new blocks would initially be broadcast in extended format and legacy nodes could receive downgraded versions.
+
+Legacy nodes may be unable to spend their coins unless they peer with nodes that can perform the upgrade, directly or via a path of legacy nodes.  Wallet software could easily be updated to produce etx messages.  It is more efficient for wallets to manage their own UTXOs than expecting the data to be stored on every noce.  This creates an incentive for wallet users to upgrade.  
