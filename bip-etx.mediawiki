@@ -9,9 +9,9 @@
 
 ==Abstract==
 
-Transactions references all unspent transaction outputs (UTXOs) by transaction id (txid) and index.  No other information about the UTXO is contained in the transaction which spends it.
+Transactions reference all unspent transaction outputs (UTXOs) by transaction id (txid) and index.  No other information about the UTXO is contained in the transaction which spends it.
 
-This BIP contains a description of a transaction serialization that contains sufficient infomation about UTXOs being spent to fully verify the transaction, other than UTXO existence and double spend checks.  This is purely a network protocol change.  The transaction serialization used for signing and generating the txid are not modified.
+This BIP describes a transaction serialization wth sufficient infomation about the UTXOs being spent to fully verify the transaction, other than UTXO existence and double spend checks.  This is purely a network protocol change.  The transaction serialization used for signing and generating the txid is not modified.
 
 ==Motivation==
 
