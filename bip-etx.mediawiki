@@ -34,8 +34,6 @@ If all the information about the UTXO was known, then the UTXOs could be stored 
 
 If the first 8 bytes were stored and assuming 20 million UTXOs in the set, the odds of a collision is 1 in 92234.  With 10 bytes, the odds are one in 6 billion.  Collisions are unlikely to occur in practice, so blocks that cause collisions could simply be rejected.  One of the colliding transactions could be included in the block and the other transaction(s) could be included in later block.  This would change the height value and the transaction would be unlikely to collide.
 
-The odds of a node accepting a false transaction is even lower.  If 8 bytes is used per entry, a transaction with a non-existent input has a one in 922 billion chance of being accepted.  Even knowing the node_specific_salt, this is considerable effort and only one node will actually accept the false transaction.
-
 In addition, since the UTXO entry size can be fixed, it may be possible to store the database more efficiently due to fixed field sizes.  Very long scriptPubKeys can be supported without increasing the UTXO database size.
 
 ====Transaction Verification Locality====
