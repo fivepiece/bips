@@ -39,11 +39,7 @@ By removing this data from the transaction structure committed to the transactio
 
 === Commitment structure ===
 
-!!!DRAFT ONLY!!!
-
 A new block rule is added which requires a commitment to the witness hashes in the coinbase (or an OP_RETURN output of a specific transaction, or somewhere else)
-
-(Hardfork after x year to move the commitment to block header?)
 
 Witness hash is the double SHA256 of a transaction including witnesses: http://blockhawk.net/diagrams/witnesstx.png. For the coinbase transaction, its witness hash is assumed to be 0x0000....0000.
 
@@ -51,34 +47,16 @@ A witness root hash is calculated with all those witness hashes as leaves, in a 
 
 No witness data is allowed in blocks that don't commit to witness data, as this would otherwise leave room from spam.
 
-==== Proposal 1: balance tree (the current implementation) ====
-The commitment is a push of exactly 41 bytes:
-*The first 4 bytes are commitment header: 0xaa21a9ed
-*The next 4 bytes describe a nonce
-*The next 1 byte is the "levels bytes", describes the number of levels in a Merkle tree (0 to 32)
-*The next 32 bytes is a commitment root hash (not the witness root hash)
+The commitment is a push of exactly 36 bytes:
+  
+  The first 4 bytes are commitment header: 0xaa21a9ed
+  The next 32 bytes is a commitment hash
+  
+where the commitment hash is:
+  
+  Double SHA256 (witness root hash|arbitrary 32-byte value)
 
-Locator of the witness root hash is defined as:
-
-<pre>SHA256('WitnessV1\x00\x00\x00\x00\x00\x00\x00' || nonce)</pre>
-
-The first levels bits of locator, interpreted in little endian, are assumed to be the position in the leaves of the Merkle tree where the witness root hash goes.
-
-The coinbase's input's witness must consist of a single byte array of 32 * levels bytes, and are assumed to be the Merkle path to connect the witness root hash to the commitment root hash.
-
-====Proposal 2: imbalance tree====
-The commitment is a push of exactly 40 bytes:
-*The first 4 bytes are commitment header: 0xaa21a9ed
-*The next 4 bytes describe a nonce
-*The next 32 bytes is a commitment root hash (not the witness root hash)
-
-Locator of the witness root hash is defined as:
-
-<pre>SHA256('WitnessV1\x00\x00\x00\x00\x00\x00\x00' || nonce)</pre>
-
-The first levels bits of locator, interpreted in little endian, are assumed to be the position in the leaves of the Merkle tree where the witness root hash goes.
-
-The coinbase's input's witness must consist of a single byte array, which the size must be a multiple of 32 bytes but not bigger than 32*32 bytes. These are assumed to be the Merkle path to connect the witness root hash to the commitment root hash. Depth of the commitment is determined by the length of the path. If the depth of the tree is 0, the path should be represented by 0x00, and the witness root hash will be same as the commitment root hash.
+and the coinbase's input's witness must consist of a single 32-byte array for the arbitrary value..
 
 === Block size limit ===
 Blocks are currently limited to 1 MB total size. We change this restriction as follows:
