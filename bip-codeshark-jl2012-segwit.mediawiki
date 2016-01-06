@@ -86,30 +86,6 @@ The new rule is s<sub>v</sub> <= 1 MB.
 
 === Other consensus critical constraints ===
 
-== Block size analysis ==
-WORK IN PROGRESS
-
-Definitions:
-<pre>
- Core block size (CBS): The block size as seen by a non-upgrading full node
- Witness size (WS): The total size of witness data in a block
- Total block size (TBS): CBS + WS
- Witness discount (WD): A discount factor for witness data in VBS calculation (1 = no discount)
- Virtual block size (VBS): CBS + (WS * WD)
- Witness adoption (WA): Proportion (in size) of new format transactions among all transactions
- Prunable ratio (PR): Proportion of signature data size in a transaction
-</pre>
-
-With some transformation it could be shown that:
-<pre>
- TBS = CBS / (1 - WA * PR)
-     = VBS / (1 - WA * PR * (1 - WD))
-</pre>
-
-In order to keep the proposal as a soft fork, the CBS must not have a upper limit higher than 1MB.
-
-The PR heavily depends on the transaction script type and input-output ratio. For example, the PR of 1-in 2-out P2PKH and 1-in 1-out 2-of-2 multisig P2SH are about 47% and 72% respectively. According to the data presented by Pieter Wuille on 7 December 2015, the current average PR on the blockchain is about 60%.
-
 
 
 == Examples ==
