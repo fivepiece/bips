@@ -41,7 +41,10 @@ By removing this data from the transaction structure committed to the transactio
 
 A new block rule is added which requires a commitment to the witness hashes in the coinbase (or an OP_RETURN output of a specific transaction, or somewhere else)
 
-Witness hash is the double SHA256 of a transaction including witnesses: http://blockhawk.net/diagrams/witnesstx.png. For the coinbase transaction, its witness hash is assumed to be 0x0000....0000.
+Witness hash is the double SHA256 of a transaction including witnesses: 
+<img src= http://blockhawk.net/diagrams/witnesstx.png></img>
+
+For the coinbase transaction, its witness hash is assumed to be 0x0000....0000.
 
 A witness root hash is calculated with all those witness hashes as leaves, in a way similar to the hashMerkleRoot in the block header.
 
