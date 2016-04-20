@@ -60,9 +60,9 @@ The item 6 is a 8-byte value of the amount of bitcoin spent in this input.
 *Otherwise, <code>hashSequence</code> is a <code>uint256</code> of <code>0x0000......0000</code>.
 
 <code>hashOutputs</code>:
-*If the sighash type is neither <code>SINGLE</code> nor <code>NONE</code>, <code>hashOutputs<code> is the double SHA256 of the serialization of all output value (8-byte little endian) with <code>scriptPubKey</code> (serialized as scripts inside CTxOuts);
+*If the sighash type is neither <code>SINGLE</code> nor <code>NONE</code>, <code>hashOutputs</code> is the double SHA256 of the serialization of all output value (8-byte little endian) with <code>scriptPubKey</code> (serialized as scripts inside CTxOuts);
 *If sighash type is <code>SINGLE</code> and the input index is not greater than the number of outputs, <code>hashOutputs</code> is the double SHA256 of the output value with <code>scriptPubKey</code> of the same index as the input;
-*Otherwise, <code>hashOutputs</code> is a <code>uint256</code> of <code>0x0000......0000</code>.<ref>In the original algorithm, a <code>uint256</code> of <code>0x0000......0001</code> is commited if the input index for a SINGLE signature is greater than the number of outputs.</ref>
+*Otherwise, <code>hashOutputs</code> is a <code>uint256</code> of <code>0x0000......0000</code>.<ref>In the original algorithm, a <code>uint256</code> of <code>0x0000......0001</code> is commited if the input index for a <code>SINGLE</code> signature is greater than the number of outputs. In this BIP a <code>0x0000......0000</code> is commited, without changing the semantics.</ref>
 
 The <code>hashPrevouts</code>, <code>hashSequence</code>, and <code>hashOutputs</code> calculated in an earlier verification may be reused in other inputs of the same transaction, so that the time complexity of the whole hashing process reduces from O(n<sup>2</sup>) to O(n).
 
