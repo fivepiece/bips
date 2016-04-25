@@ -283,18 +283,19 @@ For Bitcoin testnet, the BIP9 starttime will be midnight TBD UTC (Epoch timestam
 
 Special thanks to Gregory Maxwell for originating many of the ideas in this BIP and Luke-Jr for figuring out how to deploy this as a soft fork.
 
+== Footnotes ==
+
+<references />
+
 == Reference Implementation ==
 
-https://github.com/sipa/bitcoin/commits/segwit
+https://github.com/bitcoin/bitcoin/pull/7910
 
 == References ==
 
 *[[bip-0016.mediawiki|BIP16 Pay to Script Hash]]
 *[[bip-0143.mediawiki|BIP143 Transaction Signature Verification for Version 0 Witness Program]]
 *[[bip-0144.mediawiki|BIP144 Segregated Witness (Peer Services)]]
-
-== Footnotes ==
-<references />
 
 == Copyright ==
 
