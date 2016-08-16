@@ -1,0 +1,36 @@
+<pre>
+   BIP: x
+   Title: Dealing with OP_IF and OP_NOTIF malleability in P2WSH
+   Author: Johnson Lau <jl2012@xbt.hk>
+   Status: Draft
+   Type: Standards Track
+   Created: 2016-08-17
+</pre>
+
+==Abstract==
+
+This document specifies proposed changes to the Bitcoin script validity rules in order to make transaction malleability related to <code>OP_IF</code> and <code>OP_NOTIF</code> impossible in pay-to-witness-script-hash (P2WSH) scripts.
+
+==Motivation==
+
+<code>OP_IF</code> and <code>OP_NOTIF</code> are flow control codes in the Bitcoin script system. The programme flow is decided by whether the top stake value is True or False. However, this behaviour opens a source of malleability as a third party may replace a True (False) stack item with any other True (False) value without invalidating the transaction.
+
+The proposed rules apply only to pay-to-witness-script-hash (P2WSH) scripts described in BIP141, which has not been activated on the Bitcoin mainnet as of writing. To ensure <code>OP_IF</code> and <code>OP_NOTIF</code> transactions created before the introduction of this BIP will still be accepted by the network, the new rules are not applied to non-segregated witness scripts.
+
+==Specification==
+
+In P2WSH, the argument for <code>OP_IF</code> and <code>OP_NOTIF</code> MUST be exactly an empty vector or <code>0x01</code>, or the script evaluation fails immediately.
+
+This is deployed using BIP9 after segregated witness (BIP141) is activated. Details TBD.
+
+==Compatibility==
+
+This is a softfork on top of BIP141. The rules are enforced as a relay policy by the reference client since the first release of BIP141 (v0.13.1). To avoid risks of fund loss, users MUST NOT create P2WSH scripts that are incompatible with this BIP. An <code>OP_0NOTEQUAL</code> may be used before <code>OP_IF</code> or <code>OP_NOTIF</code> to imitate the original behaviour (which may also re-enable the malleability vector depending on the exact script).
+
+==Implementation==
+
+https://github.com/bitcoin/bitcoin/pull/8526
+
+==Copyright==
+
+This work is placed in the public domain.
