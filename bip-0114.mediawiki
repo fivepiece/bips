@@ -32,35 +32,35 @@ In [[bip-0141.mediawiki|BIP141]], witness programs with a version byte of 1 or l
 To redeem an output of this kind, the witness must consist of the following items:
 
 
-  Script_stack_1
-  Script_stack_2
+  Unused_stack_1
+  Unused_stack_2
   .
   .
-  Script_stack_X (X ≥ 0)
-  Subscript_1
-  Subscript_2
+  Unused_stack_U (U ≥ 0)
+  keyScriptCode_1
+  keyScriptCode_2
   .
   .
-  Subscript_Y (1 ≤ Y ≤ 255)
+  keyScriptCode_K
   Position
   Path
-  Metadata (Y|MAST Version)
+  Metadata (K|MAST Version) (1 ≤ K ≤ 255)
 
 
-<code>Metadata</code> is the last witness item. It is a vector of 1 to 5 bytes. The first byte is an unsigned integer between 1 to 255 denoting the number of <code>Subscript</code> (defined hereinafter). The following 0 to 4 byte(s) is an unsigned little-endian integer denoting the <code>MAST version</code>. <code>MAST Version</code> must be minimally encoded (the most significant byte must not be 0).
+<code>Metadata</code> is the last witness item. It is a vector of 1 to 5 bytes. The first byte (<code>K</code>) is an unsigned integer between 1 to 255 denoting the number of <code>keyScriptCode</code> (defined hereinafter). The following 0 to 4 byte(s) is an unsigned little-endian integer denoting the <code>MAST version</code>. <code>MAST Version</code> must be minimally encoded (the most significant byte must not be 0).
 
-<code>Path</code> is the second last witness item. It is a serialized Merkle path of the <code>Script Hash</code> (defined hereinafter). Size of <code>Path</code> must be a multiple of 32 bytes, and not more than 1024 bytes. Each 32 byte word is a double-SHA256 merkle node in the merkle branch connecting to the <code>Script Root</code> (defined hereinafter). <code>Depth</code> of the tree (0 to 32) is the size of <code>Path</code> divided by 32.
+<code>Path</code> is the second last witness item. It is a serialized Merkle path of the <code>keyScriptCode Hash</code> (defined hereinafter). Size of <code>Path</code> must be a multiple of 32 bytes, and not more than 1024 bytes. Each 32 byte word is a double-SHA256 merkle node in the merkle branch connecting to the <code>Script Root</code> (defined hereinafter). <code>Depth</code> of the tree (0 to 32) is the size of <code>Path</code> divided by 32.
 
-<code>Position</code> is the third last witness item. It indicates the location of the <code>Script Hash</code> in the Merkle tree, with zero indicating the leftmost position. It is an unsigned little-endian integer with not more than 4 bytes. It must be minimally encoded: the value must not be larger than the maximum number of items allowed by the <code>Depth</code> of the tree, and the most significant byte must not be 0. For example, if <code>Depth</code> is 4, the valid range of <code>Position</code> is 0 to 15 (2<sup>4</sup>-1).
+<code>Position</code> is the third last witness item. It indicates the location of the <code>keyScriptCode Hash</code> in the Merkle tree, with zero indicating the leftmost position. It is an unsigned little-endian integer with not more than 4 bytes. It must be minimally encoded: the value must not be larger than the maximum number of items allowed by the <code>Depth</code> of the tree, and the most significant byte must not be 0. For example, if <code>Depth</code> is 4, the valid range of <code>Position</code> is 0 to 15 (2<sup>4</sup>-1).
 
-Depends on the first byte of <code>Metadata</code>, there should be 1 to 255 <code>Subscript</code> witness item(s) before <code>Position</code>.
+Depends on the first byte of <code>Metadata</code>, there should be 1 to 255 <code>keyScriptCode</code> witness item(s) before <code>Position</code>. It is invalid to have no <code>keyScriptCode</code>.
 
-<code>Script Hash</code> is defined as:
+<code>keyScriptCode Hash</code> is defined as:
 
-  Script Hash = H(Y|H(Subscript_1)|H(Subscript_2)|...|H(Subscript_Y))
+  keyScriptCode Hash = H(K|H(keyScriptCode_1)|H(keyScriptCode_2)|...|H(keyScriptCode_Y))
   H() = SHA256(SHA256())
 
-where <code>Y</code> is a 1-byte value denoting number of <code>Subscript</code>, followed by the hash of each <code>Subscript</code>
+where <code>K</code> is a 1-byte value denoting number of <code>keyScriptCode</code>, followed by the hash of each <code>keyScriptCode</code>
 
 <code>Script Root</code> is the Merkle root calculated by the <code>ComputeMerkleRootFromBranch</code> function, using <code>Script Hash</code>, <code>Path</code> and <code>Position</code>.
 
@@ -68,19 +68,59 @@ where <code>Y</code> is a 1-byte value denoting number of <code>Subscript</code>
 
 The script evaluation fails if <code>MAST Root</code> does not match the witness program.
 
-If the <code>MAST Root</code> matches the witness program and <code>MAST Version</code> is greater than 0, the script returns a success without further evaluation. <code>SigOpsCost</code> is counted as 0. This is reserved for future script upgrades.
 
-If the <code>MAST Version</code> is 0, the <code>Subscript</code>(s) are serialized to form the final <code>MAST Script</code>, beginning with </code>Subscript_1</code>. The unused witness item(s) before the </code>Subscript_1</code> are used as <code>Input Stack</code> to feed to the <code>MASTScript</code>. (Similar to P2WSH in BIP141)
+=== Non-version 0 MAST ===
 
-The script fails with one of the following conditions:
-* <code>MAST Script</code> is malformed (i.e. not enough data provided for the last push operation). Individual <code>Subscript</code> might be malformed, as long as they are serialized into a valid <code>MAST Script</code>
-* Size of <code>MAST Script</code> is larger than 10,000 bytes
-* Size of any one of the <code>Input Stack</code> item is larger than 520 bytes
-* Number of non-push operations (<code>nOpCount</code>) is more than 201. <code>nOpCount</code> is the sum of the number of non-push operations in <code>MAST Script</code> (counted in the same way as P2WSH <code>witnessScript</code>), number of <code>Subscript</code> (Y), and <code>Depth</code> of the Merkle tree.
+If the <code>MAST Root</code> matches the witness program and <code>MAST Version</code> is greater than 0, the script returns a success without further evaluation. <code>SigOpsCost</code> is counted as 0. Transactions with non-version 0 MAST are not relayed nor mined by default but are valid in blocks. This is reserved for future script upgrades.
 
-The <code>MAST Script</code> is then evaluated with the <code>Input Stack</code> (with some new or redefined opcodes described in BIPXXX). The evaluation must not fail, and result in an exactly empty stack.
 
-Counting of <code>SigOpsCost</code> is based on the <code>MAST Script</code>, described in BIPYYY.
+=== Version 0 MAST ===
+
+If the <code>MAST Version</code> is 0, the witness stack is parsed as follow:
+
+
+  Input_stack_1
+  Input_stack_2
+  .
+  .
+  Input_stack_I (I ≥ 0)
+  sigScriptCode_1
+  sigScriptCode_2
+  .
+  .
+  sigScriptCode_S
+  S (0 ≤ S ≤ 6)
+  keyScriptCode_1
+  keyScriptCode_2
+  .
+  .
+  keyScriptCode_K
+  Position
+  Path
+  Metadata (K) (1 ≤ K ≤ 255)
+
+
+The witness item before the first <code>keyScriptCode Hash</code> is a value (<code>S</code>) from 0 to 6 denoting the number of <code>sigScriptCode</code> (defined hereinafter). It must be minimally encoded: using an empty vector for 0 and exactly 1 byte for 1 to 6.
+
+The 0 to 6 witness items before <code>S</code> are <code>sigScriptCode</code>. The first <code>sigScriptCode</code> must not be empty (i.e. with at least 1-byte in size). Subsequent <code>sigScriptCode</code> may be empty.
+
+Any unused witness items are used as <code>Input Stack</code> to feed to the script evaluation. (Similar to P2WSH in BIP141)
+
+<code>sigScriptCode</code> and <code>keyScriptCode</code> are evaluated sequentially and individually, starting from <code>sigScriptCode_1</code> (if any) and finishing with <code>keyScriptCode_K</code>. Scripts are not combined and therefore totally <code>S + K</code> scripts are evaluated.
+
+Stack is carried over from one script to the next script, but alt-stack is reset to empty after evaluation of a script.
+
+The script evaluation fails with one of the following conditions:
+* Evaluation of any of the scripts fails (with some new or redefined opcodes described in BIPXXX).
+* Any of the scripts is malformed (i.e. not enough data provided for the last push operation).
+* Any of the scripts has an unbalanced OP_IF condition. Any conditional branch opened in a script must be closed in the same script. (TBD: disable OP_IF etc.)
+* Size of any one of the <code>Input Stack</code> item is larger than 520 bytes. (TBD)
+* The total size of all <code>sigScriptCode</code> and <code>keyScriptCode</code> is larger than 10,000 bytes. (TBD)
+* Number of non-push operations (<code>nOpCount</code>) is more than 201. (TBD) <code>nOpCount</code> is the sum of the number of non-push operations in all <code>sigScriptCode</code> and <code>keyScriptCode</code> (counted in the same way as P2WSH <code>witnessScript</code><ref>With an exception for OP_CHECKMULTISIGVERIFY, see BIPYYY</ref>), number of <code>keyScriptCode</code> (K), and <code>Depth</code> of the Merkle tree.
+* Any non-empty <code>sigScriptCode</code> is not directly nor indirectly committed to by at least one signature operation in <code>keyScriptCode</code> (details in BIPYYY).
+* After the evaluation of the last <code>keyScriptCode</code>, the stack must be exactly empty or the evaluation is also failed.
+
+Counting of <code>SigOpsCost</code> is described in BIPYYY.
 
 == Rationale ==
 === MAST Structure ===
@@ -103,22 +143,33 @@ In the current proposal, the user has to transform the redeem condition into 12 
 One way to implement the general MAST design is using a combination of <code>OP_EVAL</code>, <code>OP_CAT</code>, and <code>OP_HASH256</code>. However, that will suffer from the problems of <code>OP_EVAL</code>, including risks of indefinite program loop and inability to do static program analysis. A complicated implementation is required to fix these problems and is difficult to review.
 
 The advantages of the current proposal are:
-* <code>Subscript</code> are located at a fixed position in the witness stack. This allows static program analysis, such as static <code>SigOpsCost</code> counting and early termination of scripts with disabled opcodes.
-* If different parties in a contract do not want to expose their scripts to each other, they may provide only <code>H(Subscript)</code> and keep the <code>Subscript</code> private until redemption.
-* If they are willing to share the actual scripts, they may combine them into one <code>Subscript</code> for each branch, saving some <code>nOpCount</code> and a few bytes of witness space.
+* <code>keyScriptCode</code> are located at a fixed position in the witness stack. This allows static program analysis, such as static <code>SigOpsCost</code> counting and early termination of scripts with disabled opcodes.
+* If different parties in a contract do not want to expose their scripts to each other, they may provide only <code>H(keyScriptCode)</code> and keep the <code>keyScriptCode</code> private until redemption.
+* If they are willing to share the actual scripts, they may combine them into one <code>keyScriptCode</code> for each branch, saving some <code>nOpCount</code> and a few bytes of witness space.
 
 The are some disadvantages, but only when the redemption condition is very complicated:
 * It may require more branches than a general MAST design (as shown in the previous example) and take more witness space in redemption
 * Creation and storage of the MAST structure may take more time and space. However, such additional costs affect only the related parties in the contract but not any other Bitcoin users.
 
 === MAST Version ===
-This proposal allows users to indicate the version of scripting language in the witness, which is cheaper than doing that in <code>scriptPubKey</code> or <code>scriptSig</code>. Undefined versions remain anyone-can-spend and are reserved for future expansions. A new version could be used for relaxing constraints (e.g. the 10,000 bytes size limit of <code>MAST Script</code>), adding or redefining opcodes, or even introducing a completely novel scripting system.
+This proposal allows users to indicate the version of scripting language in the witness, which is cheaper than doing that in <code>scriptPubKey</code> or <code>scriptSig</code>. Undefined versions remain anyone-can-spend and are reserved for future expansions. A new version could be used for relaxing constraints (e.g. the 10,000 bytes script size limit), adding or redefining opcodes, or even introducing a completely novel scripting system, as long as the basic MAST structure is followed.
+
+=== sigScriptCode ===
+In the design of original Bitcoin script system, functional (non-push) operations are allowed in signature (<code>scriptSig</code>). However, without the ability to sign the codes in <code>scriptSig</code> with a signature operation in <code>scriptPubKey</code>, this design has no practical value but is a source of third party malleability. In later script system including P2SH and P2WSH, functional operations in signature is not allowed unless that is committed to by the <code>scriptPubKey</code>.
+
+However, functional operations in signature could be useful in many situations as it allows redefinition of redemption conditions after a transaction is confirmed. For examples,
+* A single signature UTXO may effectively become 1-of-n multi signature, without first spending the UTXO.
+* New redemption conditions may be added to a multi signature UTXO with agreement of different parties.
+* With blockchain data manipulating codes such as the proposed <code>OP_CHECKBLOCKATHEIGHT</code>, it allows the use of most updated data.
+
+The proposed <code>sigScriptCode</code> design allows inclusion of scripts in signature which is not committed to by the <code>scriptPubKey</code>. However, to avoid third party malleability, any non-empty <code>sigScriptCode</code> must be directly or indirectly committed to by at least one signature operation in <code>keyScriptCode</code>. The details are described in BIPYYY.
 
 === nOpCount limit ===
-In version 0 MAST, the extra hashing operations in calculating the <code>MAST Root</code> are counted towards the 201 <code>nOpCount</code> limit to prevent abusive use. This limitation is not applied to undefined <code>MAST Version</code> for flexibility, but it is constrained by the 255 <code>Subscript</code> and 32 <code>Depth</code> limits.
+In version 0 MAST, the extra hashing operations in calculating the <code>MAST Root</code> are counted towards the 201 <code>nOpCount</code> limit to prevent abusive use. This limitation is not applied to undefined <code>MAST Version</code> for flexibility, but it is still constrained by the 255 <code>keyScriptCode</code> and 32 <code>Depth</code> limits.
 
 === Script evaluation ===
-This proposal requires script evaluation resulting in an empty stack, instead of a single <code>TRUE</code> value as in P2WSH. This allows each party in a contract to provide its own <code>Subscript</code>, and demonstrate the required <code>Input Stack</code> to clean up its own <code>Subscript</code>. In this case, order of the <code>Subscript</code> is not important since the overall objective is to clean up the stack after evaluation.
+This proposal requires overall script evaluation resulting in an empty stack, instead of a single <code>TRUE</code> value as in P2WSH. This allows each party in a contract to provide its own <code>keyScriptCode</code>, and demonstrate the required <code>Input Stack</code> to clean up its own <code>keyScriptCode</code>. In this case, order of the <code>keyScriptCode</code> is not important since the overall objective is to clean up the stack after evaluation.
+
 
 == Examples ==
 === Calculation of MAST Root ===
@@ -126,7 +177,7 @@ This proposal requires script evaluation resulting in an empty stack, instead of
 <img src=bip-0114/mastexample.png></img>
 
 
-  Subscript:
+  keyScriptCode:
     SA = 1 EQUALVERIFY (0x5188)
     SB = 2 EQUALVERIFY (0x5288)
     SC = 3 EQUALVERIFY (0x5388)
@@ -159,15 +210,16 @@ The scriptPubKey with native witness program is:
 
 To redeem with the <code>SD|SE|SF</code> branch, the witness is
 
-  Script_stack_1: 0x06
-  Script_stack_2: 0x05
-  Script_stack_3: 0x04
-  Subscript_1:    0x5488
-  Subscript_2:    0x5588
-  Subscript_3:    0x5688
-  Position:       0x01 (HF is the second hash in its level)
-  Path (HE|HJ):   0x049b9f2f94f0a9bdea624e39cd7d6b27a365c6a0545bf0e9d88d86eff4894210d00fc690c4700d0f983f9700740066531ea826b21a4cbc62f80317261723d477
-  Metadata:       0x03 (3 Subscript)
+  Input_stack_1   : 0x06
+  Input_stack_2   : 0x05
+  Input_stack_3   : 0x04
+  # sigScriptCode : null
+  keyScriptCode_1 : 0x5488
+  keyScriptCode_2 : 0x5588
+  keyScriptCode_3 : 0x5688
+  Position        : 0x01 (HF is the second hash in its level)
+  Path (HE|HJ)    : 0x049b9f2f94f0a9bdea624e39cd7d6b27a365c6a0545bf0e9d88d86eff4894210d00fc690c4700d0f983f9700740066531ea826b21a4cbc62f80317261723d477
+  Metadata        : 0x03 (3 keyScriptCode)
 
 
 
@@ -236,72 +288,55 @@ The idea of MAST originates from Russell O’Connor, Pieter Wuille, and [https:/
 == Reference Implementation ==
 https://github.com/jl2012/bitcoin/tree/bip114v2 (WIP)
 
+Parsing of basic MAST stack:
 <source lang="cpp">
-//New rules apply if version byte is 1 and witness program size is 32 bytes
-if (witversion == 1 && program.size() == 32 && (flags & SCRIPT_VERIFY_MAST)) {
-    CHashWriter sRoot(SER_GETHASH, 0);
-    CHashWriter sScriptHash(SER_GETHASH, 0);
-    uint32_t nMASTVersion = 0;
-    size_t stacksize = witness.stack.size();
-    if (stacksize < 4)
-        return set_error(serror, SCRIPT_ERR_INVALID_MAST_STACK);
+bool IsMASTStack(const CScriptWitness& witness, uint32_t& nMASTVersion, std::vector<uint256>& path, uint32_t& position, std::vector<std::vector<unsigned char> >& stack, std::vector<CScript>& keyScriptCode)
+{
+    size_t witstacksize = witness.stack.size();
+    if (witstacksize < 4)
+        return false;
     std::vector<unsigned char> metadata = witness.stack.back(); // The last witness stack item is metadata
     if (metadata.size() < 1 || metadata.size() > 5)
-        return set_error(serror, SCRIPT_ERR_INVALID_MAST_STACK);
+        return false;
 
-    // The first byte of metadata is the number of subscripts (1 to 255)
-    uint32_t nSubscript = static_cast<uint32_t>(metadata[0]);
-    if (nSubscript == 0 || stacksize < nSubscript + 3)
-        return set_error(serror, SCRIPT_ERR_INVALID_MAST_STACK);
-    int nOpCount = nSubscript; // Each condition consumes a nOpCount
-    sScriptHash << metadata[0];
+    // The first byte of metadata is the number of keyScriptCode (1 to 255)
+    uint32_t nKeyScriptCode = static_cast<uint32_t>(metadata[0]);
+    if (nKeyScriptCode == 0 || witstacksize < nKeyScriptCode + 3)
+        return false;
 
     // The rest of metadata is MAST version in minimally-coded unsigned little endian int
+    nMASTVersion = 0;
     if (metadata.back() == 0)
-        return set_error(serror, SCRIPT_ERR_INVALID_MAST_STACK);
+        return false;
     if (metadata.size() > 1) {
         for (size_t i = 1; i != metadata.size(); ++i)
             nMASTVersion |= static_cast<uint32_t>(metadata[i]) << 8 * (i - 1);
     }
 
-    // Unknown MAST version is non-standard
-    if (nMASTVersion > 0 && flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM)
-        return set_error(serror, SCRIPT_ERR_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM);
-
-    sRoot << nMASTVersion;
-
     // The second last witness stack item is the pathdata
     // Size of pathdata must be divisible by 32 (0 is allowed)
     // Depth of the Merkle tree is implied by the size of pathdata, and must not be greater than 32
-    std::vector<unsigned char> pathdata = witness.stack.at(stacksize - 2);
+    std::vector<unsigned char> pathdata = witness.stack.at(witstacksize - 2);
     if (pathdata.size() & 0x1F)
-        return set_error(serror, SCRIPT_ERR_INVALID_MAST_STACK);
+        return false;
     unsigned int depth = pathdata.size() >> 5;
     if (depth > 32)
-        return set_error(serror, SCRIPT_ERR_INVALID_MAST_STACK);
-
-    // Each level of Merkle tree consumes a nOpCount
-    // Evaluation of version 0 MAST terminates early if there are too many nOpCount
-    // Not enforced in unknown MAST version for upgrade flexibility
-    nOpCount = nOpCount + depth;
-    if (nMASTVersion == 0 && nOpCount > MAX_OPS_PER_SCRIPT)
-        return set_error(serror, SCRIPT_ERR_OP_COUNT);
+        return false;
 
     // path is a vector of 32-byte hashes
-    std::vector <uint256> path;
     path.resize(depth);
     for (unsigned int j = 0; j < depth; j++)
         memcpy(path[j].begin(), &pathdata[32 * j], 32);
 
     // The third last witness stack item is the positiondata
     // Position is in minimally-coded unsigned little endian int
-    std::vector<unsigned char> positiondata = witness.stack.at(stacksize - 3);
+    std::vector<unsigned char> positiondata = witness.stack.at(witstacksize - 3);
+    position = 0;
     if (positiondata.size() > 4)
-        return set_error(serror, SCRIPT_ERR_INVALID_MAST_STACK);
-    uint32_t position = 0;
+        return false;
     if (positiondata.size() > 0) {
         if (positiondata.back() == 0)
-            return set_error(serror, SCRIPT_ERR_INVALID_MAST_STACK);
+            return false;
         for (size_t k = 0; k != positiondata.size(); ++k)
             position |= static_cast<uint32_t>(positiondata[k]) << 8 * k;
     }
@@ -309,41 +344,131 @@ if (witversion == 1 && program.size() == 32 && (flags & SCRIPT_VERIFY_MAST)) {
     // Position value must not exceed the number of leaves at the depth
     if (depth < 32) {
         if (position >= (1U << depth))
-            return set_error(serror, SCRIPT_ERR_INVALID_MAST_STACK);
+            return false;
     }
 
-    // Sub-scripts are located before positiondata
-    for (size_t i = stacksize - nSubscript - 3; i <= stacksize - 4; i++) {
-        CScript subscript(witness.stack.at(i).begin(), witness.stack.at(i).end());
+    // keyScriptCode are located before positiondata
+    keyScriptCode.resize(nKeyScriptCode);
+    for (size_t i = 0; i < nKeyScriptCode; i++) {
+        size_t pos = witstacksize - 3 - nKeyScriptCode + i;
+        keyScriptCode.at(i) = CScript(witness.stack.at(pos).begin(), witness.stack.at(pos).end());
+    }
 
-        // Evaluation of version 0 MAST terminates early if script is oversize
-        // Not enforced in unknown MAST version for upgrade flexibility
-        if (nMASTVersion == 0 && (scriptPubKey.size() + subscript.size()) > MAX_SCRIPT_SIZE)
-            return set_error(serror, SCRIPT_ERR_SCRIPT_SIZE);
+    // Return unused items as stack
+    stack = std::vector<std::vector<unsigned char> > (witness.stack.begin(), witness.stack.end() - 3 - nKeyScriptCode);
+
+    return true;
+}
+</source>
+
+Parsing of version 0 MAST stack:
+<source lang="cpp">
+bool ParseMASTV0Stack(std::vector<std::vector<unsigned char> >& stack, std::vector<CScript>& sigScriptCode) {
+    if (stack.size() == 0)
+        return false;
+
+    size_t nSigScriptCode = 0;
+    if (stack.back().size() == 0)
+        nSigScriptCode = 0;
+    else if (stack.back().size() == 1 && stack.back().at(0) >= 1 && stack.back().at(0) <= MAX_MAST_V0_SIGSCRIPTCODE)
+        nSigScriptCode = static_cast<size_t>(stack.back().at(0));
+    else
+        return false;
+
+    if (stack.size() < nSigScriptCode + 1)
+        return false;
+
+    sigScriptCode.clear();
+    sigScriptCode.resize(MAX_MAST_V0_SIGSCRIPTCODE);
+    for (size_t i = nSigScriptCode; i > 0; i--) {
+        size_t pos = stack.size() - 1 - i;
+        // The first defined sigScriptCode must not be empty or that becomes malleable.
+        if (i == nSigScriptCode && stack.at(pos).size() == 0)
+            return false;
+        sigScriptCode.at(MAX_MAST_V0_SIGSCRIPTCODE - i) = CScript(stack.at(pos).begin(), stack.at(pos).end());
+    }
+
+    // Unused items are input stack
+    stack = std::vector<std::vector<unsigned char> > (stack.begin(), stack.end() - 1 - nSigScriptCode);
+    return true;
+}
+</source>
+
+Calculating <code>MAST Root</code> and script evaluation:
+<source lang="cpp">
+if (witversion == 1 && program.size() == 32 && (flags & SCRIPT_VERIFY_MAST)) {
+    uint32_t nMASTVersion;
+    std::vector<uint256> path;
+    uint32_t position;
+    std::vector<std::vector<unsigned char> > stack;
+    std::vector<CScript> keyScriptCode, sigScriptCode;
+
+    if (!IsMASTStack(witness, nMASTVersion, path, position, stack, keyScriptCode))
+        return set_error(serror, SCRIPT_ERR_INVALID_MAST_STACK);
+    if (nMASTVersion == 0 && !ParseMASTV0Stack(stack, sigScriptCode))
+        return set_error(serror, SCRIPT_ERR_INVALID_MAST_STACK);
+
+    // Unknown MAST version is non-standard
+    if (nMASTVersion > 0 && flags & SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM)
+        return set_error(serror, SCRIPT_ERR_DISCOURAGE_UPGRADABLE_WITNESS_PROGRAM);
+
+    // Calculate the script hash
+    CHashWriter sScriptHash(SER_GETHASH, 0);
+    // Starts with 1-byte number of keyScriptCode
+    sScriptHash << static_cast<unsigned char>(keyScriptCode.size());
+
+    for (size_t i = 0; i < keyScriptCode.size(); i++) {
+        CScript subscript = keyScriptCode.at(i);
         uint256 hashSubScript;
         CHash256().Write(&subscript[0], subscript.size()).Finalize(hashSubScript.begin());
         sScriptHash << hashSubScript;
-        scriptPubKey = scriptPubKey + subscript; // Final scriptPubKey is a serialization of subscripts
     }
     uint256 hashScript = sScriptHash.GetHash();
 
     // Calculate MAST Root and compare against witness program
     uint256 rootScript = ComputeMerkleRootFromBranch(hashScript, path, position);
-    sRoot << rootScript;
+    CHashWriter sRoot(SER_GETHASH, 0);
+    sRoot << nMASTVersion << rootScript;
     uint256 rootMAST = sRoot.GetHash();
     if (memcmp(rootMAST.begin(), &program[0], 32))
         return set_error(serror, SCRIPT_ERR_WITNESS_PROGRAM_MISMATCH);
 
     if (nMASTVersion == 0) {
-        stack = std::vector<std::vector<unsigned char> >(witness.stack.begin(), witness.stack.end() - 3 - nSubscript);
+        int nOpCount = keyScriptCode.size() + path.size(); // Each keyScriptCode and tree depth consumes an nOpCount
+        if (nOpCount > MAX_OPS_PER_SCRIPT)
+            return set_error(serror, SCRIPT_ERR_OP_COUNT);
+
+        // Check the size of input stack
         for (unsigned int i = 0; i < stack.size(); i++) {
             if (stack.at(i).size() > MAX_SCRIPT_ELEMENT_SIZE)
                 return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
         }
 
-        // Script evaluation must not fail, and return an empty stack
-        if (!EvalScript(stack, scriptPubKey, flags, checker, SIGVERSION_WITNESS_V1, nOpCount, serror))
-            return false;
+        // Check script size and evaluate scripts. Stack must be empty after evaluation of all scripts
+        size_t totalScriptSize = 0;
+        unsigned int fSigScriptCodeUncommitted = 0;
+        for (size_t i = 0; i < MAX_MAST_V0_SIGSCRIPTCODE; i++) {
+            totalScriptSize += sigScriptCode[i].size();
+            if (totalScriptSize > MAX_SCRIPT_SIZE)
+                return set_error(serror, SCRIPT_ERR_SCRIPT_SIZE);
+            if (sigScriptCode[i].size() > 0) {
+                fSigScriptCodeUncommitted |= (1U << i);
+                if (!EvalScript(stack, sigScriptCode[i], flags, checker, SIGVERSION_WITNESS_V1, nOpCount, prevScript, hashScript, sigScriptCode, i, fSigScriptCodeUncommitted, serror))
+                    return false;
+            }
+        }
+        for (size_t i = 0; i < keyScriptCode.size(); i++) {
+            totalScriptSize += keyScriptCode[i].size();
+            if (totalScriptSize > MAX_SCRIPT_SIZE)
+                return set_error(serror, SCRIPT_ERR_SCRIPT_SIZE);
+            if (!EvalScript(stack, keyScriptCode[i], flags, checker, SIGVERSION_WITNESS_V1, nOpCount, prevScript, hashScript, sigScriptCode, MAX_MAST_V0_SIGSCRIPTCODE, fSigScriptCodeUncommitted, serror))
+                return false;
+        }
+
+        // All non-empty sigScriptCode must be directly or indirectly committed to by at least one signature operation in keyScriptCode
+        if (fSigScriptCodeUncommitted)
+            return set_error(serror, SCRIPT_ERR_UNCOMMITED_SIGSCRIPTCODE);
+
         if (stack.size() != 0)
             return set_error(serror, SCRIPT_ERR_EVAL_FALSE);
     }
@@ -370,7 +495,7 @@ uint256 ComputeMerkleRootFromBranch(const uint256& leaf, const std::vector<uint2
 
 
 == References ==
-*[[bip-0141.mediawiki|BIP141 Segregated Witness (Consensus layer)]]
+<references />
 
 == Copyright ==
 This document is placed in the public domain.
