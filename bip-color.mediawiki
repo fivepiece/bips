@@ -1,0 +1,147 @@
+<pre>
+  Layer: Consensus (soft fork)
+  Title: Colored Coin
+  Author: Johnson Lau <jl2012@xbt.hk>
+  Status: Draft
+  Type: Standards Track
+  Created: 2017-07-31
+  License: BSD-3-Clause
+           CC0-1.0
+</pre>
+
+==Abstract==
+This BIP defines a new set of backward compatible consensus rules, to enable issuance and transfer of multiple asset types on the Bitcoin blockchain, known as colored coin.
+
+==Motivation==
+To enable issuance and transfer of multiple asset types on the Bitcoin blockchain with the following features:
+
+* SPV friendly: color of an output is known by looking at the transaction, without referring to parent transaction(s)
+* Repeatable asset issuance: an asset could be repeatedly issued by its issuer, and this ability could be proven in a compact way
+* Non-repeatable asset issuance: issuance of an asset is guaranteed to be an one-off event on a given blockchain, and could be proven in a compact way
+
+Applications:
+
+* Repeatable asset issuance is suitable for asset types that the total supply is expected to vary over time, such as fiat currency tokens issued by an exchange
+* Non-repeatable asset issuance is suitable for asset types that are expected to have fixed supply, such as smart properties
+
+
+(to be completed)
+
+==Specification==
+Unless specified, the following rules apply only to non-coinbase transactions with <code>nVersion</code> (interpreted as unsigned little endian integer) greater than 2.
+
+===Colored transaction outputs===
+
+A new variable <code>color</code> is defined for all transaction outputs, in addition to the existing <code>scriptPubKey</code> and <code>nValue</code>. <code>color</code> is a 256-bit value. <code>null color</code> is a special <code>color</code> with 256-bit 0 value. An output or UTXO is "colored" if it has <code>color</code> other than <code>null color</code>.
+
+<code>color commitment</code> is a transaction output with a special <code>scriptPubKey</code> pattern. It MUST have at least 36 bytes in size, with the first 4 bytes as <code>OP_RETURN</code>, <code>OP_PUSHDATA2</code>, <code>0x85</code>, and <code>0xad</code> (the <code>header</code>). A transaction may have any number of <code>color commitment</code>, including no <code>color commitment</code>.
+
+The 32 bytes following the <code>header</code> is <code>color tag</code>, a double SHA256 hash derived from previous blockchain data (to be defined hereinafter). <code>color tag</code> MUST NOT have all 32 bytes as 0 value, or the transaction is invalid.
+
+Any remaining bytes form a variable-length little-endian <code>bitfield</code>. It MUST have at least 1 byte in size, or the transaction is invalid. Consequently, all <code>color commitment</code> MUST have at least 37 bytes in size or the transaction is invalid.
+
+<code>bitfield</code> encodes which output(s) have the associated <code>color</code> by setting corresponding bit(s). For example, <code>0x2504</code> means the outputs 0, 2, 5 and 10 are all assigned the <code>color</code> as shown in the <code>color tag</code>.
+
+<code>bitfield</code> MUST be minimally encoded. The transaction is invalid if any <code>bitfield</code> is out-of-range (a set bit referring to a non-existing output) or ends with a 0 value byte (which should be removed).
+
+If an output is not assigned <code>color</code> by any <code>color commitment</code>, by definition it has <code>null color</code>. (note that explicitly assigning <code>null color</code> is invalid).
+
+Any <code>color commitment</code>, which itself is also a transaction output, MUST have <code>null color</code> or the transaction is invalid.
+
+Repeated <code>color</code> assignment to an output is invalid. If a bit-X is set in a <code>bitfield</code>, the same bit-X MUST NOT be set in any other <code>color commitment</code>.
+
+It is valid to have multiple <code>color commitment</code> with the same <code>color tag</code>, as long as they do not have repeated <code>color</code> assignment.
+
+Any colored output MUST NOT have 0 value, or the transaction is invalid.
+
+Any transaction outputs confirmed before the activation of this proposal has <code>null color</code>.
+
+===Colored transaction inputs===
+
+<code>color</code> of transaction inputs are determined by the bit 23 and 24 of the <code>nSequence</code>.
+
+If both bits are set (<code>SEQUENCE_COLOR_TRANSFER</code>), the input has the same <code>color</code> as the associated previous output.
+
+If only the bit-23 is set (<code>SEQUENCE_COLOR_SCRIPT</code>), the input color is the double-SHA256 hash of <code>0x00008000</code> followed by the <code>scriptPubKey</code> of the UTXO being spent.
+
+If only the bit-24 is set (<code>SEQUENCE_COLOR_PREVOUT</code>), the input color is the double-SHA256 hash of <code>0x00000001</code> followed by the <code>txid</code> and <code>n</code> of the UTXO being spent.
+
+If both bits are not set (<code>SEQUENCE_COLOR_NULL</code>), the input MUST be <code>null color</code>.
+
+The use of <code>SEQUENCE_COLOR_TRANSFER</code> is invalid if the previous output has <code>null color</code>.
+
+The use of <code>SEQUENCE_COLOR_SCRIPT</code>, <code>SEQUENCE_COLOR_PREVOUT</code>, or <code>SEQUENCE_COLOR_NULL</code> is invalid if the previous output is colored.
+
+===Colored value===
+
+Except <code>null color</code>, for every <code>color</code> found in transaction outputs, the total output value MUST NOT be higher than the total input value for the same <code>color</code>.
+
+Destroying colored value: if for a specific <code>color</code> the total output value is lower than the total input value, such excessive colored value is considered as <code>null color</code> value. This process is irreversible.
+
+Any transaction fees are paid in <code>null color</code> by definition.
+
+===Coinbase and legacy version transactions===
+
+By definition, all outputs in a coinbase transaction (regardless of <code>nVersion</code>) and transactions with unsigned <code>nVersion</code> of 2 or below have <code>null color</code>. The <code>nSequence</code> fields and any <code>color commitment</code>-like outputs do not have any new consensus meaning for such transactions.
+
+Spending a colored UTXO in a transaction with legacy <code>nVersion</code> will irrevocably destroy the <code>color</code>.
+
+== Rationale ==
+
+===The OP_RETURN color commitment design===
+
+This is a formal proposal adapted from the author's previous <code>OP_CHECKCOLORVERIFY</code> idea, revised to be compatible with segregated witness. Due to the canonical format requirements and limited size of witness program, there is no adequate space to encode color in the <code>scriptPubKey</code> of each output. This proposal therefore uses special <code>OP_RETURN</code> outputs to encode the color information.
+
+This BIP employed the <code>OP_RETURN</code> approach, instead of order-based coloring. Although order-based coloring is more space efficient, it is unfriendly to light wallets as it is not possible to determine color of an output without looking back to the whole transaction history up to the generation of the colored coin.
+
+===Choice of color commitment header===
+
+In the early years of Bitcoin, a wrong way of <code>sigOp</code> counting was introduced as consensus, by counting <code>sigOp</code> of output <code>scriptPubKey</code>. Therefore, we need to make sure that nothing in the <code>color commitment</code> would be counted as <code>sigOp</code>. The most obvious way is to make the color information as a push operation. However, the size of <code>bitfield</code> (thus the size of <code>color commitment</code>) is indefinite as it is dependent on the number of outputs. Therefore, the magic header of <code>color commitment</code> is chosen as <code>OP_RETURN OP_PUSHDATA2 0x85 0xad</code>, which means pushing 44,421 bytes of data to the stack. With the maximum block size of 1,000,000 bytes and the minimum output size of 9 bytes, a valid transaction would never have more than 111,111 outputs, which require 13,889 bytes of <code>bitfield</code> to encode. This guarantees that any valid <code>color commitment</code> must have exactly one incomplete and invalid push, which is always counted as 0 <code>sigOp</code>. Since <code>OP_RETURN</code> outputs are certainly unspendable, the use of invalid push does not have any side-effects.
+
+===Prevention of accidental color destruction by old wallets===
+
+There is no mechanism to prevent old wallets from accidentally spending colored UTXO and destroy the <code>color</code>. Although it is possible to forbid spending colored UTXO in transactions with legacy versions, this could become a DoS attack vector by sending colored coins to public addresses and "jamming" unupgraded wallets. This will also make unupgraded miners generating invalid blocks by including such transactions.
+
+So the burden of preventing accidental <code>color</code> destruction should be placed on the wallet design. Upgraded wallets SHOULD always use newly generated addresses or addresses from a new deterministic wallet path to accept colored coins. This makes sure that old wallets would never see such colored UTXO.
+
+===Prevention of accidental color destruction by upgraded hardware wallets===
+
+The bit 23 and 24 of the <code>nSequence</code> are occupied by this proposal. They are the lowest unused bits following the <code>type flag</code> of BIP68.
+
+For upgraded wallets, especially those hardware wallets with limited processing power, the <code>SEQUENCE_COLOR_TRANSFER</code> and <code>SEQUENCE_COLOR_NULL</code> prevent accedental destroying of color. Even if the wallet does not know whether the UTXO is colored or not, the worst case would be producing an invalid transaction and no color information would be lost. For <code>SEQUENCE_COLOR_TRANSFER</code>, a hardware wallet would only know a input is colored, but not be certain about the color value. A workaround would be using different hierarchical deterministic wallet for different <code>color</code> type. At protocol level, a later softfork may provide an option to allow a signature to cover the color type of the signed input.
+
+===Two mode of colored coin generation===
+
+Two types of color generation are defined. <code>SEQUENCE_COLOR_SCRIPT</code> is based on the <code>scriptPubKey</code> of the UTXO being spent. This allows repeated generation of coins with the same <code>color</code> by the person or group controlling the associated private key(s). This is suitable for asset types that the total supply is expected to vary over time. On the other hand, <code>SEQUENCE_COLOR_PREVOUT</code> is based on the <code>txid</code> and <code>n</code> of the UTXO being spent. As duplicated <code>txid</code> is not possible due to BIP34, issuance of such asset is guaranteed to be an one-off event on a given blockchain. By placing <code>0x00008000</code> or <code>0x00000001</code> (the bit 23 and 24 for little endian intergers) at the beginning of hashed data, it is not possible to produce counterfeit colored coins by specially crafted <code>scriptPubKey</code> or <code>txid</code>. It also provides a compact way for light wallets to determine the type of <code>color</code>.
+
+A future softfork might provide an option to restrict the ability of repeated generation, for example, by invalidating a script after a certain block time (<code>OP_CHECKLOCKTIMEVERIFY</code> only allows invalidating a script ''before'' a certain block time), or making it dependent on other blockchain or transaction parameters (such as "generation is allowed only if some other colored coins are destroyed"). This is out of the scope of this proposal.
+
+===Validation costs===
+
+The verification of colored value is a process with O(NlogN) complexity. By forbidding color assignment to <code>color commitment</code> themselves and creation of zero value color outputs, we effectively limit the theoretical worst case to about 3,308 unique color in a 1MB transaction.
+
+===Intentional color destruction===
+
+While the protocol is designed to avoid accedental <code>color</code> destruction, in some case it might be desirable to intentionally destroy colored coin. One way is to send colored coins to unspendable <code>OP_RETURN</code> outputs, but that would also burn the associated bitcoin.
+
+In this protocol, if for a specific <code>color</code> the total output value is lower than the total input value, such excessive colored value is considered as <code>null color</code> value. This mean some colored coins would be turn back to generic <code>null color</code> coins, and could be spent and mixed with other <code>null color</code> coins in legacy or new version transactions.
+
+== Examples ==
+
+Repeatable color coin issuance is suitable for fiat currency tokens issued by an exchange, as the total supply of such tokens are expected to vary over time, and users of such tokens ultimately trust the issuer.
+
+Non-repeatable color coin issuance is suitable for assets with fixed supply, such as smart properties. A special use would be generating a non-repeatable colored coin with a value of only 1 satoshi. Such colored coin is and unsplittable and may be linked to a real world property, such as a vehicle or a hotel room.
+
+== Backward compatibility ==
+Older wallets will continue to operate without modification. However, if they try to spend a colored UTXO using a legacy transaction version, the <code>color</code> will be destroyed. It is important for wallets using new addresses to accept colored coins to avoid such kind of accedental <code>color</code> destruction.
+
+== Deployment ==
+Exact details TBD.
+
+
+== Reference Implementation ==
+https://github.com/jl2012/bitcoin/commits/color
+
+
+== Copyright ==
+This document is dual licensed as BSD 3-clause, and Creative Commons CC0 1.0 Universal.
