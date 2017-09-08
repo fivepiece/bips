@@ -1,0 +1,177 @@
+<pre>
+  BIP: YYY
+  Layer: Consensus (soft fork)
+  Title: ECDSA signature operations in Merklized Script Version 0
+  Author: Johnson Lau <jl2012@xbt.hk>
+  Comments-Summary: No comments yet.
+  Comments-URI: https://github.com/bitcoin/bips/wiki/Comments:BIP-0YYY
+  Status: Draft
+  Type: Standards Track
+  Created: 2017-07-19
+  License: BSD-3-Clause
+           CC0-1.0
+</pre>
+
+==Abstract==
+This BIP defines ECDSA signature operations in Merklized Script Version 0.
+
+==Motivation==
+To safely re-enable <code>OP_CAT</code>, <code>OP_LEFT</code>, <code>OP_RIGHT</code>, <code>OP_SUBSTR</code>, <code>OP_INVERT</code>, <code>OP_AND</code>, <code>OP_OR</code>, <code>OP_XOR</code>, <code>OP_RSHIFT</code>, and <code>OP_LSHIFT</code>.
+
+Use of compact signatures to save space.
+
+==Specification==
+The following specification is applicable to <code>scriptKeyCode</code> and <code>scriptWitCode</code> for <code>MSV0</code>. For all purposes, the signature checking of <code>P2WPKV0</code> is equivalent to a <code>OP_CHECKSIG</code> <code>scriptKeyCode</code>.
+
+In this section, x<sub>n</sub> represents the top-n item on the stack. For example, x<sub>1</sub> is the top stack item, and x<sub>2</sub> is the second-to-top item. Evaluation MUST fail if there is not enough stack item to be consumed.
+
+===Public Key Format===
+The public key used in all operations described in this BIP MUST be in compressed form, starting with a <code>0x02</code> or <code>0x03</code> with a size of 33 bytes.
+
+===Signature Format===
+Size of the ECDSA signature for <code>OP_CHECKSIG</code>, <code>OP_CHECKSIGVERIFY</code>, <code>OP_CHECKMULTISIG</code>, <code>OP_CHECKMULTISIGVERIFY</code> MUST be 64 to 66 bytes. The first 32-byte is the <code>R</code> value in big-endian. The next 32-byte is the <code>S</code> value in big-endian. The remaining bytes, if any, denotes the <code>nHashType</code> in little-endian (0 - 65535).
+
+The <code>S</code> value MUST be at most the curve order divided by 2 (see BIP62).
+
+<code>nHashType</code> MUST be minimally encoded (trailing zero MUST be removed).
+
+Empty signature is accepted as the "valid failing" signature.
+
+===New nHashType definitions===
+<code>nHashType</code> and the <code>SignatureHash</code> function are completely re-defined under <code>MSV0</code>:
+
+  Double SHA256 of the serialization of:
+     1. nVersion (4-byte little endian)
+     2. nInputIndex (4-byte little endian)
+     3. hashPrevouts (32-byte hash)
+     4. prevoutSingle (32-byte hash + 4-byte little endian)
+     5. hashSequence (32-byte hash)
+     6. sequenceSingle (4-byte little endian)
+     7. nAmount (8-byte little endian)
+     8. hashOutputs (32-byte hash)
+     9. outputSingleValue (8-byte little endian)
+    10. outputSingleScript (serialized as scripts inside CTxOuts)
+    11. nFees (8-byte little endian)
+    12. nLocktime (4-byte little endian)
+    13. scriptCode (serialized as scripts inside CTxOuts)
+    14. scriptWitCode0 (serialized as scripts inside CTxOuts)
+    15. scriptWitCode1 (serialized as scripts inside CTxOuts)
+    16. scriptWitCode2 (serialized as scripts inside CTxOuts)
+    17. scriptWitCode3 (serialized as scripts inside CTxOuts)
+    18. scriptWitCode4 (serialized as scripts inside CTxOuts)
+    19. nHashType (4-byte little endian)
+    20. nSigVersion (4-byte little endian for the fixed value 0x01000000)
+
+The bit 0 and bit 1 of <code>nHashType</code> determines the value of <code>hashPrevouts</code>, <code>prevoutSingle</code> and <code>nAmount</code>:
+* If value of the bits are <code>00</code>, <code>hashPrevouts</code> is the hash of all input <code>prevout</code> as described in BIP143. In all other cases, it is a <code>uint256</code> of <code>0x0000......0000</code>.
+* If value of the bits are <code>01</code> (known as <code>SIGHASH_MSV0_SINGLEINPUT</code>), <code>prevoutSingle</code> is the <code>COutPoint</code> of the current input. In all other cases, it is a <code>uint256</code> of <code>0x0000......0000</code> followed by <code>0xffffffff</code>.
+* If value of the bits are <code>11</code> (known as <code>SIGHASH_MSV0_NOINPUT_NOVALUE</code>), <code>nAmount</code> is -1. In all other cases, it is the value of the current input (same as BIP143).
+* The bit combination <code>10</code> is also known as <code>SIGHASH_MSV0_NOINPUT</code>.
+
+The bit 2 and bit 3 of <code>nHashType</code> determines the value of <code>hashSequence</code>, <code>sequenceSingle</code>:
+* If value of the bits are <code>10</code>, the signature is invalid and the script evaluation MUST fail.
+* If value of the bits are <code>00</code>, <code>hashSequence</code> is the hash of all input <code>nSequence</code> as described in BIP143. In all other cases, it is a <code>uint256</code> of <code>0x0000......0000</code>.
+* If value of the bits are <code>01</code> (known as <code>SIGHASH_MSV0_SINGLESEQUENCE</code>), <code>sequenceSingle</code> is the <code>nSequence</code> of the current input. In all other cases, it is <code>0xffffffff</code>.
+* The bit combination <code>11</code> is also known as <code>SIGHASH_MSV0_NOSEQUENCE</code>.
+
+The bit 4 and bit 5 of <code>nHashType</code> determines the value of <code>hashOutputs</code>, <code>outputSingleValue</code> and <code>outputSingleScript</code>:
+* If value of the bits are <code>00</code>, <code>hashOutputs</code> is the hash of all <code>CTxOut</code> as described in BIP143. In all other cases, it is a <code>uint256</code> of <code>0x0000......0000</code>.
+* If value of the bits are <code>01</code> (known as <code>SIGHASH_MSV0_SINGLEOUTPUT</code>), <code>outputSingleValue</code> is the value of the same index output. In all other cases, it is -1.
+* If value of the bits are <code>01</code> or <code>10</code> (known as <code>SIGHASH_MSV0_SINGLEOUTPUT_NOVALUE</code>), <code>outputSingleScript</code> is the <code>scriptPubKey</code> of the same index output. In all other cases, it is an empty script.
+* The bit combination <code>11</code> is also known as <code>SIGHASH_MSV0_NOOUTPUT</code>.
+* <code>SIGHASH_MSV0_SINGLEOUTPUT</code> and <code>SIGHASH_MSV0_SINGLEOUTPUT_NOVALUE</code> are invalid if the input has no corresponding output with the same index, and the script MUST fail.
+
+If bit 6 is set (<code>SIGHASH_MSV0_NOINPUTINDEX</code>), <code>nInputIndex</code> is <code>0xffffffff</code>. Otherwise, it is the index of the current input.
+
+If bit 7 is set (<code>SIGHASH_MSV0_NOFEE</code>), <code>nFees</code> is -1. Otherwise, it is the amount the transaction fees paid by this transaction.
+
+If bit 8 is set (<code>SIGHASH_MSV0_NOSCRIPTCODE</code>), <code>scriptCode</code> is an empty script. Otherwise, it is same as described in BIP143. It should be noted that <code>scriptCode</code> is derived from the currently executed <code>scriptWitCode</code> or <code>scriptKeyCode</code> (the leading 0 version byte removed). 
+
+If bit 9 is set (<code>SIGHASH_MSV0_NOVERSION</code>), <code>nVersion</code> is <code>0xffffffff</code>. Otherwise, it is the transaction <code>nVersion</code>.
+
+If bit 10 is set (<code>SIGHASH_MSV0_NOLOCKTIME</code>), <code>nLockTime</code> is <code>0xffffffff</code>. Otherwise, it is the transaction <code>nLockTime</code>.
+
+Bits 11 to 15 are <code>SIGHASH_MSV0_NOSCRIPTWITCODE0</code> to <code>SIGHASH_MSV0_NOSCRIPTWITCODE4</code>. For example, if <code>SIGHASH_MSV0_NOSCRIPTWITCODE0</code> is set, <code>scriptWitCode0</code> is an empty script. Otherwise, it is the actually executed <code>scriptWitCode0</code>. If there are less than 5 <code>scriptWitCode</code> defined, the undefined ones are treated as empty scripts.
+
+<code>nHashType</code> of <code>0</code> is also known as <code>SIGHASH_MSV0_ALL</code>, which covers all the available options.
+
+<code>nHashType</code> of <code>0xffff</code> is also known as <code>SIGHASH_MSV0_NONE</code>, which covers nothing and is effectively forfeiting the right related to this public key to anyone.
+
+===The scriptWitCode Coverage rules===
+In this section "cover" or "coverage" means a <code>scriptWitCode</code> is signed by a valid ECDSA signature with the corresponding <code>SIGHASH_MSV0_NOSCRIPTWITCODE</code> not set.
+
+The rules are:
+* All non-empty <code>scriptWitCode</code> MUST be directly or indirectly covered by at least one signature operation inside <code>scriptKeyCode</code>, or the script MUST fail
+* A <code>scriptWitCode</code> is directly covered if it is covered by at least one signature operation inside <code>scriptKeyCode</code>
+* Signature operations inside a directly covered <code>scriptWitCode</code> may cover another <code>scriptWitCode</code> with higher index. In this case, the higher index <code>scriptWitCode</code> is indirectly covered. For example, if <code>scriptWitCode1</code> is directly covered, signature operations inside <code>scriptWitCode1</code> may cover <code>scriptWitCode2</code> to <code>scriptWitCode4</code>, but not <code>scriptWitCode0</code>.
+* Similarly, signature operations inside an indirectly covered <code>scriptWitCode</code> may cover another <code>scriptWitCode</code> with higher index.
+* It is valid if a <code>scriptWitCode</code> signature operation tries to sign the same <code>scriptWitCode</code> or those with lower index. However, this is not considered to be satisfying the coverage rules, even if the <code>scriptWitCode</code> itself is properly covered. For example, the coverage path <code>scriptKeyCode->scriptWitCode2->scriptWitCode4</code> is valid, while <code>scriptKeyCode->scriptWitCode2->scriptWitCode1</code> is invalid.
+
+===The CHECKMULTISIG flag rules===
+The previously unused dummy stack item for <code>OP_CHECKMULTISIG</code> and <code>OP_CHECKMULTISIGVERIFY</code> is re-defined as <code>flag</code>, a signed <code>CScriptNum</code>. It is a bitmap indicating which public keys are used to sign the transaction. For example, the setting the bit 0 of <code>flag</code> indicates that the first public key (closest to the top of stack) is used.
+
+The script MUST fail in one of the following conditions:
+* The <code>flag</code> value is negative
+* The number of set bit is not exactly same as the number of required signature
+* A bit is set without a corresponding public key (the bit is out-of-range)
+
+The <code>nOpCount</code> for a <code>OP_CHECKMULTISIG</code> or <code>OP_CHECKMULTISIGVERIFY</code> is 1 plus the number of required signatures.
+
+===The NULLFAIL rules===
+For <code>OP_CHECKSIG</code>, if the signature checking fails but the signature size is not 0, the script MUST fail.
+
+For <code>OP_CHECKMULTISIG</code>, if one of the signature checking fails, all signatures and the <code>flag</code> MUST be empty vectors or the script MUST fail.
+
+===OP_CHECKSIGFROMSTACKVERIFY===
+A new operation <code>OP_CHECKSIGFROMSTACKVERIFY</code> is defined, with the value of <code>0xba</code>. It removes the top 3 items from the stack. The top item is the public key which MUST be 33 bytes compressed format. The second highest item is the <code>message</code>, which MUST be 32 bytes. The third highest item is the signature which MUST be 64 bytes with compact format as described. A ECDSA validation is performed. If the signature is invalid for the given <code>message</code> and public key, the script evaluation MUST fail.
+
+===sigOpCost===
+Each <code>OP_CHECKSIG</code>, <code>OP_CHECKSIGVERIFY</code> and <code>OP_CHECKSIGFROMSTACKVERIFY</code> is counted as 1 <code>sigOpCost</code> towards the block limit.
+
+For ''m''-of-''n'' <code>OP_CHECKMULTISIG</code> or <code>OP_CHECKMULTISIGVERIFY</code>, it is counted as ''m'' <code>sigOpCost</code> if all of the following conditions are satisfied:
+* The number of public keys (''n'') is canonically encoded, i.e. the operation immediately before the <code>OP_CHECKMULTISIG</code> or <code>OP_CHECKMULTISIGVERIFY</code> is within <code>OP_1</code> to <code>OP_16</code> (inclusive)
+* All the ''n'' operations before that are push only, i.e. with <code>Opcode</code> value below <code>0x61</code>, excluding <code>OP_RESERVED</code> (pushing public keys)
+* The number of required signatures (''m'') is canonically encoded, i.e. the operation immediately before the public key pushes is within <code>OP_1</code> to <code>OP_16</code> (inclusive)
+
+Otherwise, it is counted as ''n'' <code>sigOpCost</code> if the number of public keys is canonically encoded.
+
+If the number of public keys is not canonically encoded, it is counted as 20 <code>sigOpCost</code>.
+
+Same as the <code>sigOpCost</code> counting in previous script versions, the counting in <code>MSV0</code> is static and does not involve script execution. Operations in unexecuted conditional branches are also counted.
+
+==Rationale==
+===Signature Format===
+The current DER format is a complete waste of block space. Saving ~8 bytes per signature. Increase capacity by 5%? (TBC)
+
+===New nHashType definitions===
+The default and most commonly used case is <code>SIGHASH_MSV0_ALL</code>. Minimize signature size with the 0 value.
+
+===The scriptWitCode Coverage rules===
+To make sure all <code>scriptWitCode</code> are not malleable.
+
+===The CHECKMULTISIG flag rules===
+Minimize signature checking operations. Optimize <code>sigOpCost</code> counting. With signature aggregation, need to know which public keys were used.
+
+===OP_CHECKSIGFROMSTACKVERIFY===
+
+
+==Examples==
+
+
+== Backward compatibility ==
+As a soft fork, older software will continue to operate without modification. Non-upgraded nodes, however, will consider <code>MSV0</code> and <code>P2WPKV0</code> programs as anyone-can-spend scripts.
+
+== Deployment ==
+Exact details TBD.
+
+== Reference Implementation ==
+https://github.com/jl2012/bitcoin/commits/vault
+
+== Credits ==
+The specification and reference implementation of <code>OP_CHECKSIGFROMSTACKVERIFY</code> is taken from the [http://elementsproject.org/ Elements Project], with modifications.
+
+== References ==
+*[[bip-0114.mediawiki|BIP114 Merklized Script]]
+
+== Copyright ==
+This document is dual licensed as BSD 3-clause, and Creative Commons CC0 1.0 Universal.

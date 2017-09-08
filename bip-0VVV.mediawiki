@@ -1,0 +1,80 @@
+<pre>
+  BIP: VVV
+  Layer: Consensus (soft fork)
+  Title: Pay-to-witness-public-key
+  Author: Johnson Lau <jl2012@xbt.hk>
+  Comments-Summary: No comments yet.
+  Comments-URI: https://github.com/bitcoin/bips/wiki/Comments:BIP-0VVV
+  Status: Draft
+  Type: Standards Track
+  Created: 2017-09-01
+  License: BSD-3-Clause
+           CC0-1.0
+</pre>
+
+==Abstract==
+This BIP defines a new witness program type that allow payments to a single public key, which is complementary to the BIP114 Merklized Script proposal.
+
+==Motivation==
+Since the inception of Bitcoin, payment to single ECDSA public key has been the absolutely dominant transaction type. All of the early transactions (both mining reward and normal transactions) used pay-to-public-key (P2PK), where the public keys were directly recorded in the <code>scriptPubKey</code>. P2PK has 128-bit of security.
+
+In the early days of Bitcoin, only 65-byte uncompressed public key was used. As that was too big as payment address, pay-to-public-key-hash (P2PKH) was later introduced. Instead of the full public key, only a 160-bit hash of the public key was recorded in the <code>scriptPubKey</code>. This allows a more compact address format: the well known "1 prefix" base58 address. The full public key is exposed only when a payment is made out of a P2PKH output. As long as the public key has not been exposed, P2PKH has 160-bit of security. After exposed, the security level becomes equivalent to P2PK.
+
+The use of 33-byte compressed public key was introduced to the reference client at version 0.6. While the theoretically highest block space efficient way is to use P2PK with compressed public key, P2PKH has remained the standard due to the popularity of base58 address.
+
+Pay-to-script-hash (<code>P2SH</code>) was later introduced. While in theory it could be used for payment to single public key, it was primarily designed for payment to multiple public key. While P2SH has 160 bits, as multi-signature address it has only 80-bit collision resistance security. As explained in BIP141, this is now considered as inadequate.
+
+Segregated witness further defines pay-to-witness-public-key-hash (P2WPKH) for payment to single public key. It has the same cryptographic security level as P2PKH, and is currently the most efficient way to conduct such transaction type (in terms of block weight). Pay-to-witness-script-hash (P2WSH) with 256-bit size was also defined primarily for multi-signature and complicated scripts, giving 128-bit collision resistance security.
+
+Despite the block weight efficiency, the 160-bit P2WPKH is adequately secure only because it is being used for payment to single entity. With the anticipated introduction of Schnorr signature scheme, it will be possible to combine multiple public keys as one, making payment to n-of-n entities indistinguishable from payment to single entity. In order to maintain the security level, it has to use either the raw public key (like P2PK) or a 256-bit hash (like P2WSH). Since a compressed public key is 33-byte, it is more efficient than using a 32-byte hash in <code>scriptPubKey</code> with public key in witness. 
+
+This BIP defines a new witness program type that allow payments to a single public key by marking the raw public key in the <code>scriptPubKey</code>. It is complementary to the BIP114 Merklized Script proposal. Technically this proposal could achieve all the functionality of BIP114, with different validation cost tradeoff.
+ 
+==Specification==
+If witness program version byte is 1 and the program size is 33 bytes, it is interpreted as Pay-to-Witness-Public-Key-Version-0 (<code>P2WPKV0</code>). The witness program MUST be a valid compressed public key, and is evaluated as if it is a <code>MSV0</code> <code>scriptKeyCode</code> in the form of <code><Public Key> OP_CHECKSIG</code>.
+
+Witness stack format for <code>P2WPKV0</code> is same as <code>MSV0</code> but without <code>Key Code</code>, <code>Path</code>, and <code>Position</code>. All script evaluation rules are same as <code>MSV0</code>.
+
+Details of <code>MSV0</code> could be found in BIP114.
+
+===Upgradability===
+If witness program version byte is 1 but the program size is bigger than 33 bytes, the script returns a success without further evaluation. Later versions of <code>P2WPK</code> may use a bigger witness program to denote the version. It is expected that new <code>P2WPK</code> versions will always match with new Merklized Script versions.
+
+== Examples ==
+Same as <code>MSV0</code>, <code>P2WPKV0</code> allows the key holder(s) to include additional scripts as <code>scriptWitCode</code>. When this is used with multi-party Schnorr signature scheme, <code>P2WPKV0</code> could achieve all the functionality of BIP114, with different validation cost tradeoff.
+
+=== Escrow with Timeout ===
+The following is the "Escrow with Timeout" example in [[bip-0112.mediawiki|BIP112]]:
+    IF
+        2 <Alice's pubkey> <Bob's pubkey> <Escrow's pubkey> 3 CHECKMULTISIG
+    ELSE
+        "30d" CHECKSEQUENCEVERIFY DROP
+        <Alice's pubkey> CHECKSIG
+    ENDIF
+
+With Schnorr signature scheme, we could combine the 3 public keys as a single key <code>Key-ABE</code>. Alice (the buyer) will create an unsigned escrow transaction, paying the required amount to <code>Key-ABE</code> with <code>P2WPKV0</code>. Based on the <code>txid</code> of the unsigned transaction, each of them will provide 4 different signatures for the following <code>scriptWitCode0</code>:
+
+    <Key-AB> CHECKSIG
+    <Key-AE> CHECKSIG
+    <Key-BE> CHECKSIG
+    "30d" CHECKSEQUENCEVERIFY <Key-A> CHECKSIG
+
+They would use an <code>nHashType</code> of <code>0xf7fd</code>. As defined in BIPYYY, this <code>nHashType</code> means the signer requires a specific <code>scriptWitCode0</code>. It also signs the <code>outpoint</code> of the associated input, so that the signature is not replayable. The signature does not cover any other parts of the transaction, which will be decided by the delegated key. When all the 12 signatures are ready, Alice will sign and broadcast the escrow transaction.
+
+When Bob has delivered the product, in the co-operative case, the 3 parties are expected to sign a transaction to transfer the escrowed value to Bob. If there were disputes, or any party became non-responsive, the remaining parties may transfer the escrowed value with a <code>scriptWitCode0</code> and corresponding signature. 
+
+The major advantage of this scheme is that in the co-operative case, the transaction is totally indistinguishable from a simple transaction paying by a single signature, and transaction weight is smaller than using <code>MSV0</code>. However, it requires an interactive setup, and secure storage of the signatures. In the dispute case, the transaction weight is bigger than using <code>MSV0</code>, and it requires validation of 2 signatures instead of 1. This is the trade-off to be considered by the users.
+
+== Backward compatibility ==
+As a soft fork, older software will continue to operate without modification. Non-upgraded nodes, however, will consider Merklized Script and <code>P2WPKV0</code> programs as anyone-can-spend scripts. Wallets should always be wary of anyone-can-spend scripts and treat them with suspicion.
+
+== Deployment ==
+Exact details TBD.
+
+
+== Reference Implementation ==
+https://github.com/jl2012/bitcoin/commits/vault
+
+
+== Copyright ==
+This document is dual licensed as BSD 3-clause, and Creative Commons CC0 1.0 Universal.

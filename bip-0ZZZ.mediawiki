@@ -1,0 +1,144 @@
+<pre>
+  BIP: ZZZ
+  Layer: Consensus (soft fork)
+  Title: OP_PUSHTXDATA
+  Author: Johnson Lau <jl2012@xbt.hk>
+  Comments-Summary: No comments yet.
+  Comments-URI: https://github.com/bitcoin/bips/wiki/Comments:BIP-0ZZZ
+  Status: Draft
+  Type: Standards Track
+  Created: 2017-07-19
+  License: BSD-3-Clause
+           CC0-1.0
+</pre>
+
+==Abstract==
+This BIP defines a new operation <code>OP_PUSHTXDATA</code> in Merklized Script Version 0.
+
+==Motivation==
+Covenant: outputs must follow a pre-specified pattern
+
+Vault: require an extra step to spend deep cold storage
+
+Fine-tuned transaction signing, e.g. "fees must be at least 100 satoshis per weight unit", "number of outputs must not be bigger than number of inputs", "signing only 2 outputs", "values of outputs X and Y must not be the same"
+
+(To be completed)
+
+==Specification==
+The following specification is applicable to <code>scriptKeyCode</code> of <code>MSV0</code>, and <code>scriptWitCode</code> for <code>MSV0</code> and <code>P2WPKV0</code>.
+
+A new operation <code>OP_PUSHTXDATA</code> is defined, with the value of <code>0xbb</code>. The top stack item MUST be a <code>CScriptNum</code> from 0 to 15 or the evaluation fails. The value determines the type of <code>TXDATA</code> to be pushed. If the <code>TXDATA</code> type is smaller than 10, it is removed from the stack and a single value is returned to the top of stack. All values returned are <code>CScriptNum</code>.
+
+{|
+|-
+! <code>TXDATA</code> type
+! Name
+! Value returned to stack
+|-
+| 0
+| <code>TXDATA_THIS_VIN_INDEX</code>
+| Index of the current input
+|-
+| 1
+| <code>TXDATA_VIN_SIZE</code>
+| Number of inputs in the transaction
+|-
+| 2
+| <code>TXDATA_VOUT_SIZE</code>
+| Number of outputs in the transaction
+|-
+| 3
+| <code>TXDATA_THIS_VIN_VALUE</code>
+| Value of the current input (in satoshi)
+|-
+| 4
+| <code>TXDATA_FEE</code>
+| The fees paid by the transaction (in satoshi)
+|-
+| 5
+| <code>TXDATA_VERSION</code>
+| Transaction <code>nVersion</code> cast to an unsigned integer
+|-
+| 6
+| <code>TXDATA_LOCKTIME</code>
+| Transaction <code>nLockTime</code>
+|-
+| 7
+| <code>TXDATA_BASE_SIZE</code>
+| Transaction size without witness serialization (in bytes)
+|-
+| 8
+| <code>TXDATA_TOTAL_SIZE</code>
+| Transaction size with witness serialization (in bytes)
+|-
+| 9
+| <code>TXDATA_WEIGHT</code>
+| Transaction weight
+|}
+
+If the <code>TXDATA</code> type is 10 or greater, the second highest stack item is a <code>CScriptNum</code> determining the <code>index</code>. The script MUST fail if the <code>index</code> value is smaller than -1. If the <code>index</code> value is -1, it is evaluated as index of the current input. The top two stack items are removed, and one or more items are returned to the stack according to the <code>TXDATA</code> type and <code>index</code>. If the specified input or output does not exist, the script MUST fail.
+
+{|
+! <code>TXDATA</code> type
+! Name
+! First returned value
+! Second returned value
+! Third returned value
+|-
+| 10
+| <code>TXDATA_VIN_PREVOUT</code>
+| <code>prevout</code> hash of the specified input
+| <code>prevout</code> index of the specified input
+|-
+| 11
+| <code>TXDATA_VIN_SEQUENCE</code>
+| <code>nSequence</code> value of the specified input
+|-
+| 12
+| <code>TXDATA_VIN</code>
+| <code>prevout</code> hash of the specified input
+| <code>prevout</code> index of the specified input
+| <code>nSequence</code> value of the specified input
+|-
+| 13
+| <code>TXDATA_VOUT_VALUE</code>
+| Value of the specified output
+|-
+| 14
+| <code>TXDATA_VOUT_SCRIPTPUBKEY</code>
+| <code>scriptPubKey</code> of the specified output
+|-
+| 15
+| <code>TXDATA_VOUT</code>
+| Value of the specified output (in satoshi)
+| <code>scriptPubKey</code> of the specified output
+|}
+
+For example, if the type is <code>TXDATA_VIN</code>, 2 items are removed from and 3 items are returned to the stack, with the <code>nSequence</code> as the final top stack value.
+
+<code>prevout</code> index, <code>nSequence</code>, and output value are returned as <code><code>CScriptNum</code></code>.
+<code>prevout</code> hashes are returned as 32-byte little endian value, with the same byte sequence used in transaction serialization.
+<code>scriptPubKey</code> are returned as the actual script. For example, if the <code>scriptPubKey</code> is <code>P2WSH</code>, the returned vector size is 34 bytes (<code>0x0020{32 bytes hash}</code>). If the size of <code>scriptPubKey</code> is bigger than 520 bytes, the script MUST fail. 
+
+
+==Rationale==
+
+
+==Examples==
+
+== Backward compatibility ==
+As a soft fork, older software will continue to operate without modification. Non-upgraded nodes, however, will consider <code>MSV0</code> and <code>P2WPKV0</code> programs as anyone-can-spend scripts.
+
+== Deployment ==
+Exact details TBD.
+
+== Reference Implementation ==
+https://github.com/jl2012/bitcoin/commits/vault
+
+== Credits ==
+
+== References ==
+*[[bip-0114.mediawiki|BIP114 Merklized Script]]
+
+== Copyright ==
+This document is dual licensed as BSD 3-clause, and Creative Commons CC0 1.0 Universal.

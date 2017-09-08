@@ -1,0 +1,96 @@
+<pre>
+  BIP: WWW
+  Layer: Consensus (soft fork)
+  Title: String and Bitwise Operations in Merklized Script Version 0
+  Author: Johnson Lau <jl2012@xbt.hk>
+  Comments-Summary: No comments yet.
+  Comments-URI: https://github.com/bitcoin/bips/wiki/Comments:BIP-0WWW
+  Status: Draft
+  Type: Standards Track
+  Created: 2016-04-20
+  License: BSD-3-Clause
+           CC0-1.0
+</pre>
+
+==Abstract==
+This BIP re-enables and re-defines previous disabled string and bitwise operations, as part of Merklized Script Version 0.
+
+==Motivation==
+To safely re-enable <code>OP_CAT</code>, <code>OP_LEFT</code>, <code>OP_RIGHT</code>, <code>OP_SUBSTR</code>, <code>OP_INVERT</code>, <code>OP_AND</code>, <code>OP_OR</code>, <code>OP_XOR</code>, <code>OP_RSHIFT</code>, and <code>OP_LSHIFT</code>.
+
+==Specification==
+The following specification is applicable to <code>scriptKeyCode</code> of <code>MSV0</code>, and <code>scriptWitCode</code> for <code>MSV0</code> and <code>P2WPKV0</code>.
+
+In this section, x<sub>n</sub> represents the top-n item on the stack. For example, x<sub>1</sub> is the top stack item, and x<sub>2</sub> is the second-to-top item. Evaluation MUST fail if there is not enough stack item to be consumed.
+
+<code>OP_CAT</code> will remove the top two stack items and push the concatenated string onto the stack. For example, if x<sub>2</sub> is "abcd" and x<sub>1</sub> is "efgh", <code>OP_CAT</code> will return "abcdefgh". The script MUST fail if the total size of the concatenated string is bigger than 520 bytes.
+
+<code>OP_SUBSTR</code> will remove the top three stack items and push a substring of x<sub>3</sub> onto the stack, with x<sub>2</sub> as the starting position, and x<sub>1</sub> as the length of the substring. For example, if x<sub>3</sub> is "abcdefghij", x<sub>2</sub> is 3 and x<sub>1</sub> is 4, the returned string is "defg". The script MUST fail if x<sub>2</sub> or x<sub>3</sub> is negative, or the sum of x<sub>2</sub> and x<sub>3</sub> is bigger than the size of x<sub>1</sub>.
+
+<code>OP_LEFT</code> will remove the top two stack items and push the x<sub>1</sub> leftmost characters of x<sub>2</sub> onto the stack. For example, if x<sub>2</sub> is "abcdefghij" and x<sub>1</sub> is 6, the returned string is "abcdef". An empty vector is returned if x<sub>1</sub> is 0, and x<sub>2</sub> is returned if x<sub>1</sub> is not smaller than the size of x<sub>2</sub>. The script MUST fail if x<sub>1</sub> is negative.
+
+<code>OP_RIGHT</code> will remove the top two stack items and push the x<sub>2</sub> with the x<sub>1</sub> leftmost characters removed onto the stack. For example, if x<sub>2</sub> is "abcdefghij" and x<sub>1</sub> is 6, the returned string is "ghij". x<sub>2</sub> is returned if x<sub>1</sub> is 0, and an empty vector is returned if x<sub>1</sub> is not smaller than the size of x<sub>2</sub>. The script MUST fail if x<sub>1</sub> is negative.
+
+<code>OP_INVERT</code> will flip the bits of the top stack item, with any trailing zeros preserved. For example, 0xbeefff (0b101111101110111111111111) will become 0x411000 (0b010000010001000000000000).
+
+<code>OP_AND</code>, <code>OP_OR</code>, <code>OP_XOR</code> will remove the top two stack items and push the boolean and, or, xor of the two values onto the stack, respectively. If the size of the input items are not the same, 0-padding are made at the end of the shorter input. Size of the output MUST be same as the size of the longer input, with any trailing zeros preserved. For example, if the values are 0xdead (0b1101111010101101) and 0xbeef5600 (0b10111110111011110101011000000000):
+*<code>OP_AND</code> will return 0x9ead0000 (0b10011110101011010000000000000000),
+*<code>OP_OR</code> will return 0xfeef5600 (0b11111110111011110101011000000000),
+*<code>OP_XOR</code> will return 0x60425600 (0b01100000010000100101011000000000).
+
+<code>OP_LSHIFT</code> will remove the top two stack items. The x<sub>2</sub>, interpreted as an unsigned little-endian string, will be left-shifted by x<sub>1</sub> bits and the result is pushed onto the stack, with most significant zero bytes removed. For example, if x<sub>2</sub> is 0xbeef00 (0b101111101110111100000000) and x<sub>1</sub> is 11, the result is 0x00f07d07 (0b00000000111100000111110100000111). The following extra rules are applied (in priority):
+* The script MUST fail if x<sub>1</sub> is negative (evaluation failed)
+* If x<sub>2</sub> is an empty vector, or is not empty but consists of only 0, an empty vector MUST be returned, as long as x<sub>1</sub> is a valid nonnegative <code>CScriptNum</code> (return value)
+* The script MUST fail if the result is larger than 520 bytes (evaluation failed)
+
+<code>OP_RSHIFT</code> will remove the top two stack items. The x<sub>2</sub>, interpreted as an unsigned little-endian string, will be right-shifted by x<sub>1</sub> bits and the result is pushed onto the stack, with most significant zero bytes removed. For example, if x<sub>2</sub> is 0xbeef00 (0b101111101110111100000000) and x<sub>1</sub> is 11, the result is 0x1d (0b00011101). If x<sub>1</sub> is larger than the bit range of x<sub>2</sub>, an empty vector MUST be returned. The script MUST fail if x<sub>1</sub> is negative.
+
+==Examples==
+=== Trust-free betting ===
+Alice and Bob would like to bet against each other without third party arbitration. Each of them will generate a secret nonce (Secret-A and Secret-B respectively). In one funding transaction, they will create the following outputs, each contributing 2.1BTC:<ref>In BIPXXX, it is proposed that OP_CHECKLOCKTIMEVERIFY and OP_CHECKSEQUENCEVERIFY will pop the top stack item</ref>
+
+  Output 1 (1.1BTC)
+  Branch 1: HASH160 <Secret-A hash 160> EQUALVERIFY <Pubkey-A> CHECKSIG
+  Branch 2: "24h" CHECKSEQUENCEVERIFY <Pubkey-B> CHECKSIG
+
+  Output 2 (1.1BTC)
+  Branch 1: HASH160 <Secret-B hash 160> EQUALVERIFY <Pubkey-B> CHECKSIG
+  Branch 2: "24h" CHECKSEQUENCEVERIFY <Pubkey-A> CHECKSIG
+
+  Output 3 (2 BTC)
+  Branch 1: 2DUP HASH160 <Secret-B hash 160> EQUALVERIFY HASH160 <Secret-A hash 160> EQUALVERIFY HASH256 SWAP HASH256 XOR 1 AND VERIFY <Pubkey-A> CHECKSIG
+  Branch 2: 2DUP HASH160 <Secret-B hash 160> EQUALVERIFY HASH160 <Secret-A hash 160> EQUALVERIFY HASH256 SWAP HASH256 XOR 1 AND NOT VERIFY <Pubkey-B> CHECKSIG
+  Branch 3: 2 <Pubkey-B> <Pubkey-A> 2 CHECKMULTISIG
+
+Before signing the funding transaction, they will sign a refund transaction using the Branch 3 of Output 3, with a relative lock-time of 48 hours, paying 1 BTC to each.
+
+After the funding transaction is confirmed, they have to reveal the secret nonce within 24 hours.
+
+Based on the secret nonce, only one of the Branch 1 and 2 in Output 3 could be valid. If Bob is the winner, he will redeem the Branch 2 of Output 3 using the following signature within 48 hours:
+
+  <Sig-B> <Secret-A> <Secret-B>
+
+Alice and Bob will also redeem his/her 1.1 BTC in Output 1 and Output 2 within 24 hours, using the following signatures:
+
+  <Sig-A> <Secret-A>
+  <Sig-B> <Secret-B>
+
+If either one becomes uncooperative and fails to reveal the secret within 24 hours, the other one will be able to redeem totally 2.2 BTC from Output 1 and Output 2, and get the 1 BTC refund from Output 3 after 48 hours. The collateral makes sure that any rational player must be cooperative, without the need of third party arbitration. Unlimited number of bets may be done inside a payment channel and only the final balance will be recorded in the blockchain.
+
+== Backward compatibility ==
+As a soft fork, older software will continue to operate without modification. Non-upgraded nodes, however, will consider <code>MSV0</code> and <code>P2WPKV0</code> programs as anyone-can-spend scripts.
+
+== Deployment ==
+Exact details TBD.
+
+== Reference Implementation ==
+https://github.com/jl2012/bitcoin/commits/vault
+
+== Credits ==
+The specification and reference implementation is largely taken from the [http://elementsproject.org/ Elements Project], with modifications.
+
+== References ==
+*[[bip-0114.mediawiki|BIP114 Merklized Script]]
+
+== Copyright ==
+This document is dual licensed as BSD 3-clause, and Creative Commons CC0 1.0 Universal.

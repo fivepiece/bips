@@ -1,0 +1,68 @@
+<pre>
+  BIP: XXX
+  Layer: Consensus (soft fork)
+  Title: Numeric Operations in Merklized Script Version 0
+  Author: Johnson Lau <jl2012@xbt.hk>
+  Comments-Summary: No comments yet.
+  Comments-URI: https://github.com/bitcoin/bips/wiki/Comments:BIP-0XXX
+  Status: Draft
+  Type: Standards Track
+  Created: 2017-07-18
+  License: BSD-3-Clause
+           CC0-1.0
+</pre>
+
+==Abstract==
+This BIP re-enables and re-defines previous disabled and existing numeric operations, as part of Merklized Script Version 0.
+
+==Motivation==
+To safely re-enable the <code>OP_2MUL</code>, <code>OP_MUL</code>, <code>OP_2DIV</code>, <code>OP_DIV</code>, and <code>OP_MOD</code>
+
+To allow all arithmetic operations to accept and return up to 7-byte signed integers. While <code>CScriptNum</code> are processed as 64 bit integers internally, current arithmetic operations accept only up to 4-byte of inputs, and may return up to 5-byte. This BIP standardises the input and output size to 7 bytes, which avoids integer overflow while is enough to cover the maximum amount of coin supply (2100000000000000 < 2<sup>51</sup>)
+
+To make <code>OP_CHECKLOCKTIMEVERIFY</code> and <code>OP_CHECKSEQUENCEVERIFY</code> cleaner by removing the top stack item after evaluation
+
+==Specification==
+The specification is applicable to <code>scriptKeyCode</code> of <code>MSV0</code>, and <code>scriptWitCode</code> for <code>MSV0</code> and <code>P2WPKV0</code>.
+
+===CScriptNum value range for arithmetic operations===
+Arithmetic operations include the existing <code>OP_1ADD</code>, <code>OP_1SUB</code>, <code>OP_NEGATE</code>, <code>OP_ABS</code>, <code>OP_NOT</code>, <code>OP_0NOTEQUAL</code>, <code>OP_ADD</code>, <code>OP_SUB</code>, <code>OP_BOOLAND</code>, <code>OP_BOOLOR</code>, <code>OP_NUMEQUAL</code>, <code>OP_NUMEQUALVERIFY</code>, <code>OP_NUMNOTEQUAL</code>, <code>OP_LESSTHAN</code>, <code>OP_GREATERTHAN</code>, <code>OP_LESSTHANOREQUAL</code>, <code>OP_GREATERTHANOREQUAL</code>, <code>OP_MIN</code>, <code>OP_MAX</code>, <code>OP_WITHIN</code>, and the re-enabled <code>OP_2MUL</code>, <code>OP_MUL</code>, <code>OP_2DIV</code>, <code>OP_DIV</code>, <code>OP_MOD</code>.
+
+Under <code>MSV0</code>, size of input <code>CScriptNum</code> for arithmetic operations MUST NOT be larger than 7 byte. The value returned to stack, if any, MUST NOT be larger than 7 byte. Otherwise, the script evaluation MUST fail immediately.
+
+For any other operations not listed in this section (for example, the number of signatures for <code>OP_CHECKMULTISIG</code>), the <code>CScriptNum</code> input size limit remains unchanged, i.e. 4-byte for all operations except <code>OP_CHECKLOCKTIMEVERIFY</code> and <code>OP_CHECKSEQUENCEVERIFY</code> which might take up to 5-byte.
+
+===Re-enabling operations===
+In this section, x<sub>n</sub> represents the top-n item on the stack. For example, x<sub>1</sub> is the top stack item, and x<sub>2</sub> is the second-to-top item. Evaluation MUST fail if there is not enough stack item to be consumed.
+
+<code>OP_MUL</code> will remove the top two stack items, and push x<sub>1</sub> * x<sub>2</sub> to the top of stack. For implementations that process <code>CScriptNum</code> as 64-bit integers internally, it is important to avoid integer overflow or undefined behaviours. If the arithmetic result is unable to fit in the 7-byte limit, the evaluation MUST fail.
+
+<code>OP_2MUL</code> will remove the top stack item, and push x<sub>1</sub> * 2 to the top of stack. Since the input is restricted to 7-byte, integer overflow is not possible in the operation when 64 bit integers are used. However, the operation may still fail if the result is unable to fit in 7-byte.
+
+<code>OP_DIV</code> will remove the top two stack items, calculate x<sub>2</sub> / x<sub>1</sub>, round toward zero, and push the result to the top of stack. The evaluation MUST fail if x<sub>1</sub> is 0.
+
+<code>OP_2DIV</code> is a shortcut for <code>OP_2</code> followed by <code>OP_DIV</code>.
+
+<code>OP_MOD</code> will remove the top two stack items, and push the remainder of x<sub>2</sub> / x<sub>1</sub> to the top of stack, with the following rules (in priority):
+* The evaluation MUST fail if x<sub>1</sub> is 0 (evaluation failed)
+* Take the absolute values of the input values, calculate ABS(x<sub>2</sub>) % ABS(x<sub>1</sub>)
+* if x<sub>2</sub> is negative, the result is returned as negative  (return value)
+* Otherwise, the result is returned unchanged (return value)
+
+===Stack manipulation for lock-time checking operations===
+After evaluation of <code>OP_CHECKLOCKTIMEVERIFY</code> and <code>OP_CHECKSEQUENCEVERIFY</code>, the top stack item is removed.
+
+== Backward compatibility ==
+As a soft fork, older software will continue to operate without modification. Non-upgraded nodes, however, will consider <code>MSV0</code> and <code>P2WPKV0</code> programs as anyone-can-spend scripts.
+
+== Deployment ==
+Exact details TBD.
+
+== Reference Implementation ==
+https://github.com/jl2012/bitcoin/commits/vault
+
+== References ==
+*[[bip-0114.mediawiki|BIP114 Merklized Script]]
+
+== Copyright ==
+This document is dual licensed as BSD 3-clause, and Creative Commons CC0 1.0 Universal.
